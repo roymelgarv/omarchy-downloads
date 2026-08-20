@@ -26,7 +26,7 @@ omarchy-shell shell rescanPlugins       # force a rescan
 ## Tests
 
 ```bash
-node --test tests/          # Model.js unit tests — must pass
+node --test tests/*.test.mjs          # Model.js unit tests — must pass
 shellcheck bin/* scripts/*.sh
 bats tests/bin.bats         # bin script tests
 ```
