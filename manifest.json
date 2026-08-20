@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "roymelgarv.omarchy-downloads",
+  "name": "Downloads",
+  "version": "0.1.0",
+  "author": "Roy Melgar",
+  "license": "MIT",
+  "description": "Recent downloads at a glance: live folder watching, search, and quick actions from the bar.",
+  "kinds": ["service", "bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Downloads",
+    "description": "Shows your most recent downloads with live tracking, search, and quick actions.",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "schema": [
+      {
+        "key": "folder",
+        "type": "path",
+        "label": "Folder to watch",
+        "description": "The downloads folder this widget watches.",
+        "defaultValue": "~/Downloads"
+      },
+      {
+        "key": "recentCount",
+        "type": "integer",
+        "label": "Recent files shown",
+        "description": "How many recent files to list when not searching.",
+        "defaultValue": 5,
+        "min": 3,
+        "max": 15
+      },
+      {
+        "key": "badgeOnComplete",
+        "type": "boolean",
+        "label": "Badge on new downloads",
+        "description": "Show a dot on the bar icon when a download finishes while the panel is closed.",
+        "defaultValue": true
+      },
+      {
+        "key": "confirmTrash",
+        "type": "boolean",
+        "label": "Confirm before trashing",
+        "description": "Ask for confirmation before moving a file to the trash.",
+        "defaultValue": true
+      }
+    ]
+  }
+}

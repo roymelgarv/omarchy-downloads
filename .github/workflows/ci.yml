@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [development, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Unit tests (Model.js)
+        run: node --test tests/
+
+      - name: Manifest lint
+        run: |
+          jq -e '
+            .schemaVersion == 1 and
+            (.id | test("^[A-Za-z0-9][A-Za-z0-9._-]*$")) and
+            (.id | startswith("omarchy.") | not) and
+            (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and
+            (.kinds | length > 0) and
+            (.entryPoints | length > 0)
+          ' manifest.json
+          # every entry point must exist and be a relative path
+          for f in $(jq -r '.entryPoints[]' manifest.json); do
+            case "$f" in
+              /*|*..*) echo "invalid entry point path: $f"; exit 1 ;;
+            esac
+            test -f "$f" || { echo "missing entry point: $f"; exit 1; }
+          done
+
+      - name: No symlinks in plugin tree
+        run: |
+          if find . -path ./.git -prune -o -type l -print | grep -q .; then
+            echo "symlinks are not allowed in Omarchy plugins"; exit 1
+          fi
+
+      - name: ShellCheck
+        run: shellcheck bin/* scripts/*.sh
+
+      - name: Bats tests (bin scripts)
+        run: |
+          sudo apt-get update -q && sudo apt-get install -qy bats
+          bats tests/bin.bats
