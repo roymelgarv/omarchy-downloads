@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Reveal a path in the file manager. For files, ask the file manager to open
+# the containing folder with the file pre-selected (FileManager1 D-Bus API);
+# fall back to plain xdg-open of the folder when no file manager exposes it.
+set -euo pipefail
+
+target="${1:?usage: downloads-reveal <file-or-folder>}"
+[[ -e "$target" ]] || { echo "downloads-reveal: no such path: $target" >&2; exit 1; }
+
+abs="$(cd "$(dirname -- "$target")" && pwd)/$(basename -- "$target")"
+
+if [[ -d "$abs" ]]; then
+  exec xdg-open "$abs"
+fi
+
+if gdbus call --session \
+  --dest org.freedesktop.FileManager1 \
+  --object-path /org/freedesktop/FileManager1 \
+  --method org.freedesktop.FileManager1.ShowItems \
+  "['file://$abs']" "" >/dev/null 2>&1; then
+  exit 0
+fi
+
+exec xdg-open "$(dirname -- "$abs")"
