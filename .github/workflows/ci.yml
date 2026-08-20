@@ -16,7 +16,7 @@ jobs:
           node-version: "22"
 
       - name: Unit tests (Model.js)
-        run: node --test tests/
+        run: node --test tests/*.test.mjs
 
       - name: Manifest lint
         run: |

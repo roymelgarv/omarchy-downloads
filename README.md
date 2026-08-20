@@ -61,7 +61,7 @@ omarchy plugin remove roymelgarv.omarchy-downloads
 See [CONTRIBUTING.md](CONTRIBUTING.md). Short version:
 
 ```bash
-node --test tests/     # unit tests
+node --test tests/*.test.mjs     # unit tests
 scripts/dev.sh         # deploy to the live shell (hot reload)
 ```
 

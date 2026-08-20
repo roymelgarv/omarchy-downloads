@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Copy a file to the Wayland clipboard as text/uri-list, so it can be pasted
+# into file managers, browsers, and chat apps. --print-uri prints the encoded
+# URI instead of copying (used by the test suite, which has no compositor).
+set -euo pipefail
+
+print_only=false
+if [[ "${1:-}" == "--print-uri" ]]; then
+  print_only=true
+  shift
+fi
+
+file="${1:?usage: downloads-copy [--print-uri] <file>}"
+[[ -e "$file" ]] || { echo "downloads-copy: no such file: $file" >&2; exit 1; }
+
+# Absolute path without requiring realpath's target to be readable
+abs="$(cd "$(dirname -- "$file")" && pwd)/$(basename -- "$file")"
+
+# Percent-encode everything outside the URI unreserved set, keeping "/".
+encode() {
+  local s="$1" out="" c i
+  for ((i = 0; i < ${#s}; i++)); do
+    c="${s:i:1}"
+    case "$c" in
+      [A-Za-z0-9._~/-]) out+="$c" ;;
+      *) out+="$(printf '%%%02X' "'$c")" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
+uri="file://$(encode "$abs")"
+
+if $print_only; then
+  printf '%s\n' "$uri"
+  exit 0
+fi
+
+printf '%s' "$uri" | wl-copy --type text/uri-list

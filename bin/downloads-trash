@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Move a file to the system trash (recoverable), never a permanent delete.
+set -euo pipefail
+
+file="${1:?usage: downloads-trash <file>}"
+[[ -e "$file" ]] || { echo "downloads-trash: no such file: $file" >&2; exit 1; }
+
+gio trash -- "$file"

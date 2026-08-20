@@ -4,7 +4,7 @@
 
 ## Checklist
 
-- [ ] `node --test tests/` passes
+- [ ] `node --test tests/*.test.mjs` passes
 - [ ] `shellcheck bin/* scripts/*.sh` passes
 - [ ] `omarchy plugin validate` exits 0 on the deployed plugin dir
 - [ ] Tested against a live Omarchy shell (`scripts/dev.sh`)
