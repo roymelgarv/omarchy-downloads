@@ -27,8 +27,8 @@ Panel {
   // Clamped to the manifest schema's declared min/max: the shell hands back
   // whatever value is stored without re-validating it against the schema.
   readonly property int recentCount: {
-    var n = Number(setting("recentCount", 5))
-    if (!isFinite(n)) n = 5
+    var n = Number(setting("recentCount", 7))
+    if (!isFinite(n)) n = 7
     return Math.max(3, Math.min(15, Math.round(n)))
   }
   readonly property bool confirmTrash: setting("confirmTrash", true)

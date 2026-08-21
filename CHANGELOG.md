@@ -11,6 +11,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 - File names no longer repeat the extension; each row now shows the size and type together below the name (e.g. "130.8 KB · .PNG").
+- Default recent-file count raised from 5 to 7, using space the panel already had.
 
 ## [0.1.0] - 2026-08-20
 
