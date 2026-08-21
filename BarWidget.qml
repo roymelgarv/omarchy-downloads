@@ -313,15 +313,27 @@ Panel {
           width: parent.width
           spacing: Style.space(2)
 
-          Text {
+          Row {
             visible: root.query.trim() === "" && root.visibleEntries.length > 0
             width: parent.width
             bottomPadding: Style.space(4)
-            text: "Last " + root.recentCount + (root.recentCount === 1 ? " file" : " files")
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            font.bold: true
+            spacing: Style.space(6)
+
+            Text {
+              text: "󰋚"
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
+
+            Text {
+              text: "Latest downloads"
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
           }
 
           Repeater {
