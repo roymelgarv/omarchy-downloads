@@ -7,8 +7,7 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
-- Trashing a file shows an inline confirmation on the row itself ("✓ Moved … to trash"), which holds briefly then collapses smoothly — so deleting the last visible row doesn't jump or flicker.
-- Copying a file shows a success toast banner at the bottom of the panel, auto-dismissing after ~2.5s.
+- Success toast banner ("Moved … to trash" / "Copied … to clipboard") shown after a quick action completes, auto-dismissing after ~2.5s.
 
 ## [0.1.0] - 2026-08-20
 
