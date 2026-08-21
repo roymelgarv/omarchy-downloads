@@ -92,17 +92,46 @@ Item {
         elide: Text.ElideMiddle
       }
 
-      Text {
+      Item {
         width: parent.width
-        text: {
-          var sizeText = Model.humanSize(root.entry.size)
-          if (root.entry.partial === true) return "downloading… · " + sizeText
-          return root.ext !== "" ? sizeText + " · ." + root.ext : sizeText
+        height: Math.max(sizeText.implicitHeight, typeChip.visible ? typeChip.height : 0)
+
+        Text {
+          id: sizeText
+          anchors.left: parent.left
+          anchors.right: typeChip.visible ? typeChip.left : parent.right
+          anchors.rightMargin: typeChip.visible ? Style.space(6) : 0
+          anchors.verticalCenter: parent.verticalCenter
+          text: root.entry.partial === true
+            ? "downloading… · " + Model.humanSize(root.entry.size)
+            : Model.humanSize(root.entry.size)
+          color: root.entry.partial === true ? root.accent : root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
         }
-        color: root.entry.partial === true ? root.accent : root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        elide: Text.ElideRight
+
+        // Type chip: sharp corners, background/text inverted from the
+        // row's own palette so it stays readable across themes.
+        Rectangle {
+          id: typeChip
+          visible: root.entry.partial !== true && root.ext !== ""
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          radius: 0
+          color: root.foreground
+          width: chipText.implicitWidth + Style.space(8)
+          height: chipText.implicitHeight + Style.space(2)
+
+          Text {
+            id: chipText
+            anchors.centerIn: parent
+            text: "." + root.ext
+            color: Color.background
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+        }
       }
     }
   }
