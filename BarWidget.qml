@@ -251,7 +251,7 @@ Panel {
           visible: !!root.service
           width: parent.width
           text: root.service
-            ? Model.humanSize(root.service.totalBytes) + " · " + root.service.totalCount +
+            ? Model.humanSize(root.service.totalBytes) + " total · " + root.service.totalCount +
               (root.service.totalCount === 1 ? " file" : " files")
             : "Loading…"
           color: root.dim
