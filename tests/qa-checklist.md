@@ -24,6 +24,9 @@ this — these are the interactions only a human can judge.
 - [ ] Trash icon shows the confirmation dialog; Confirm moves the file to trash; Cancel keeps it
 - [ ] With "Confirm before trashing" off, trash acts immediately
 - [ ] Trashed file is recoverable from the system trash
+- [ ] Trashing a file shows a "Moved … to trash" toast banner above the header, which auto-dismisses after ~2.5s
+- [ ] Copying a file shows a "Copied … to clipboard" toast banner, which also auto-dismisses
+- [ ] Closing and reopening the panel clears any toast still showing
 
 ## Search & keyboard
 - [ ] Panel opens with the search field focused; typing filters the whole folder, not just recents

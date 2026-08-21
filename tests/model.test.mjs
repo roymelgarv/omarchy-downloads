@@ -162,3 +162,24 @@ test("elideMiddle shortens long names in the middle, keeping the extension", () 
   assert.ok(out.endsWith("tar.gz"));
   assert.ok(out.startsWith("a-very"));
 });
+
+// ------------------------------------------------------ actionToastMessage
+
+test("actionToastMessage formats a trash success message", () => {
+  assert.equal(Model.actionToastMessage("trash", "report.pdf"), 'Moved "report.pdf" to trash');
+});
+
+test("actionToastMessage formats a copy success message", () => {
+  assert.equal(Model.actionToastMessage("copy", "report.pdf"), 'Copied "report.pdf" to clipboard');
+});
+
+test("actionToastMessage elides long file names so the toast stays short", () => {
+  const longName = "a-very-long-download-file-name-from-somewhere-important.tar.gz";
+  const out = Model.actionToastMessage("trash", longName);
+  assert.ok(out.includes("…"));
+  assert.ok(out.length < longName.length + 20);
+});
+
+test("actionToastMessage returns an empty string for an unknown action", () => {
+  assert.equal(Model.actionToastMessage("rename", "report.pdf"), "");
+});

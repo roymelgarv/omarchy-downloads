@@ -94,6 +94,16 @@ function completedSince(prevNames, currentNames) {
   return out;
 }
 
+// Success-toast copy for a completed quick action. Elided so a long file
+// name can't stretch the banner; unknown actions render nothing (the caller
+// simply skips showing a toast).
+function actionToastMessage(action, name) {
+  var label = elideMiddle(String(name || ""), 40);
+  if (action === "trash") return "Moved \"" + label + "\" to trash";
+  if (action === "copy") return "Copied \"" + label + "\" to clipboard";
+  return "";
+}
+
 function elideMiddle(name, max) {
   var s = String(name);
   if (s.length <= max) return s;
@@ -112,6 +122,7 @@ if (typeof module !== "undefined" && module.exports) {
     searchScore: searchScore,
     filterEntries: filterEntries,
     completedSince: completedSince,
-    elideMiddle: elideMiddle
+    elideMiddle: elideMiddle,
+    actionToastMessage: actionToastMessage
   };
 }
