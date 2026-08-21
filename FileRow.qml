@@ -4,7 +4,7 @@ import qs.Ui
 import "Model.js" as Model
 
 // One downloads-list row: thumbnail (images) or type glyph, name with its
-// type + size below it, and hover/selection-revealed quick actions.
+// size and type below it, and hover/selection-revealed quick actions.
 Item {
   id: root
 
@@ -25,9 +25,8 @@ Item {
   readonly property bool isImage: ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"].indexOf(ext) !== -1
   readonly property bool hot: mouse.containsMouse || selected
   readonly property bool actionable: !(entry.partial === true)
-  readonly property bool showTypeChip: entry.partial !== true && ext !== ""
 
-  implicitHeight: Math.max(Style.space(44), metaColumn.implicitHeight + Style.space(16))
+  implicitHeight: Style.space(44)
 
   Rectangle {
     anchors.fill: parent
@@ -80,7 +79,6 @@ Item {
     }
 
     Column {
-      id: metaColumn
       width: parent.width - Style.space(40)
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(2)
@@ -96,33 +94,15 @@ Item {
 
       Text {
         width: parent.width
-        text: root.entry.partial === true
-          ? "downloading… · " + Model.humanSize(root.entry.size)
-          : Model.humanSize(root.entry.size)
+        text: {
+          var sizeText = Model.humanSize(root.entry.size)
+          if (root.entry.partial === true) return "downloading… · " + sizeText
+          return root.ext !== "" ? sizeText + " | " + root.ext.toUpperCase() : sizeText
+        }
         color: root.entry.partial === true ? root.accent : root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
         elide: Text.ElideRight
-      }
-
-      // Type chip on its own line below the size: sharp corners,
-      // background/text inverted from the row's own palette so it stays
-      // readable across theme switches.
-      Rectangle {
-        visible: root.showTypeChip
-        radius: 0
-        color: root.foreground
-        width: chipText.implicitWidth + Style.space(8)
-        height: chipText.implicitHeight + Style.space(2)
-
-        Text {
-          id: chipText
-          anchors.centerIn: parent
-          text: "." + root.ext
-          color: Color.background
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-        }
       }
     }
   }
