@@ -34,7 +34,9 @@ Item {
   property var entries: []
   readonly property int downloadingCount: entries.filter(function (e) { return e.partial }).length
 
-  property int totalBytes: 0
+  // real, not int: QML's int is a 32-bit signed value (~2.1 GB ceiling) and
+  // silently overflows negative for larger Downloads folders.
+  property real totalBytes: 0
   property int totalCount: 0
   property string lastError: ""
 
