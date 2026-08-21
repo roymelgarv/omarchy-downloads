@@ -182,10 +182,10 @@ Panel {
         spacing: Style.space(12)
 
         // Built manually rather than via PanelHero: its icon only centers
-        // against its own title+meta pairing, and meta always renders
-        // uppercase — neither works once the status line needs sentence
-        // case, so the icon and both lines of text are laid out here
-        // directly, icon centered against the title+status pair as a whole.
+        // against its own title+meta pairing, not against a hero that also
+        // includes an Open button, so the icon and both lines of text are
+        // laid out here directly, icon centered against the title+status
+        // pair as a whole.
         Item {
           width: parent.width
           implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, openButton.implicitHeight)
@@ -222,7 +222,7 @@ Panel {
             Text {
               visible: !!root.service
               width: parent.width
-              text: root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads"
+              text: (root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads").toUpperCase()
               color: root.service && root.service.downloadingCount > 0 ? Color.accent : root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -326,7 +326,7 @@ Panel {
             }
 
             Text {
-              text: "Recent downloads"
+              text: "Recent downloads".toUpperCase()
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
