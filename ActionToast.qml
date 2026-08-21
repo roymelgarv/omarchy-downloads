@@ -29,7 +29,7 @@ Rectangle {
   }
 
   height: _message !== "" ? implicitHeight : 0
-  implicitHeight: label.implicitHeight + Style.space(16)
+  implicitHeight: label.implicitHeight
   visible: height > 0
   clip: true
   radius: Style.space(6)
@@ -52,9 +52,11 @@ Rectangle {
     id: label
     anchors.left: parent.left
     anchors.right: parent.right
-    anchors.verticalCenter: parent.verticalCenter
+    anchors.top: parent.top
     anchors.leftMargin: root.horizontalPadding
     anchors.rightMargin: root.horizontalPadding
+    topPadding: Style.space(8)
+    bottomPadding: Style.space(8)
     text: "✓ " + root._message
     color: root.foreground
     font.family: root.fontFamily
