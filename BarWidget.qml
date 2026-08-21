@@ -54,7 +54,8 @@ Panel {
 
   readonly property var visibleEntries: {
     if (!service) return []
-    var filtered = Model.filterEntries(query, service.entries)
+    var safeEntries = Model.withoutDownloadPlaceholders(service.entries)
+    var filtered = Model.filterEntries(query, safeEntries)
     return query.trim() === "" ? filtered.slice(0, recentCount) : filtered
   }
 
@@ -115,11 +116,24 @@ Panel {
     iconComponent: Component {
       Item {
         Text {
+          id: iconText
           anchors.centerIn: parent
           text: "󰇚"
           color: (!!root.service && root.service.downloadingCount > 0) ? Color.accent : root.barForeground
           font.family: root.fontFamily
           font.pixelSize: Style.font.icon
+
+          // Pulse while anything is downloading, so an active transfer is
+          // noticeable without opening the panel.
+          SequentialAnimation {
+            id: pulseAnim
+            running: !!root.service && root.service.downloadingCount > 0
+            loops: Animation.Infinite
+            onRunningChanged: if (!running) iconText.opacity = 1.0
+
+            NumberAnimation { target: iconText; property: "opacity"; from: 1.0; to: 0.35; duration: 600; easing.type: Easing.InOutQuad }
+            NumberAnimation { target: iconText; property: "opacity"; from: 0.35; to: 1.0; duration: 600; easing.type: Easing.InOutQuad }
+          }
         }
 
         // Completed-download badge, cleared when any panel opens.
@@ -166,40 +180,88 @@ Panel {
         spacing: Style.space(12)
 
         // ---------------------------------------------------------- hero
-        PanelHero {
+        // Built manually rather than via PanelHero: its icon only centers
+        // against its own title+meta pairing, and meta always renders
+        // uppercase — neither works once the status line needs sentence
+        // case, so the icon and both lines of text are laid out here
+        // directly, icon centered against the title+status pair as a whole.
+        Item {
           width: parent.width
-          title: "Downloads"
-          meta: root.service
-            ? Model.humanSize(root.service.totalBytes) + " total · " + root.service.totalCount +
-              (root.service.totalCount === 1 ? " file" : " files") +
-              (root.service.downloadingCount > 0 ? " · " + root.service.downloadingCount + " downloading" : "")
-            : "Loading…"
-          foreground: root.foreground
-          fontFamily: root.fontFamily
+          implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, openButton.implicitHeight)
 
-          iconComponent: Component {
+          Text {
+            id: heroIcon
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: "󰇚"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.display
+          }
+
+          Column {
+            id: heroLabels
+            anchors.left: heroIcon.right
+            anchors.leftMargin: Style.space(14)
+            anchors.right: openButton.left
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(2)
+
             Text {
-              text: "󰇚"
+              width: parent.width
+              text: "Downloads"
               color: root.foreground
               font.family: root.fontFamily
-              font.pixelSize: Style.font.display
+              font.pixelSize: Style.font.title
+              font.bold: true
+              elide: Text.ElideRight
+            }
+
+            Text {
+              visible: !!root.service
+              width: parent.width
+              text: root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads"
+              color: root.service && root.service.downloadingCount > 0 ? Color.accent : root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+              elide: Text.ElideRight
             }
           }
 
-          trailingControl: Component {
-            Button {
-              text: "Open"
-              tooltipText: "Open the folder in the file manager"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              bordered: true
-              onClicked: {
-                if (root.service) root.service.openFolder()
-                root.close()
-              }
+          Button {
+            id: openButton
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Open"
+            tooltipText: "Open the folder in the file manager"
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            bordered: true
+            onClicked: {
+              if (root.service) root.service.openFolder()
+              root.close()
             }
           }
         }
+
+        // Size/count, flush against the panel's left edge (no indent).
+        Text {
+          visible: !!root.service
+          width: parent.width
+          text: root.service
+            ? Model.humanSize(root.service.totalBytes) + " total · " + root.service.totalCount +
+              (root.service.totalCount === 1 ? " file" : " files")
+            : "Loading…"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+          elide: Text.ElideRight
+        }
+
+        PanelSeparator { foreground: root.foreground }
 
         // -------------------------------------------------------- search
         TextField {
@@ -246,22 +308,32 @@ Panel {
           wrapMode: Text.WordWrap
         }
 
-        PanelSeparator { foreground: root.foreground }
-
         // ---------------------------------------------------------- list
         Column {
           width: parent.width
           spacing: Style.space(2)
 
-          Text {
+          Row {
             visible: root.query.trim() === "" && root.visibleEntries.length > 0
             width: parent.width
             bottomPadding: Style.space(4)
-            text: "Last " + root.recentCount + (root.recentCount === 1 ? " file" : " files")
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            font.bold: true
+            spacing: Style.space(6)
+
+            Text {
+              text: "󰋚"
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
+
+            Text {
+              text: "Recent downloads"
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
           }
 
           Repeater {

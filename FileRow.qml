@@ -95,8 +95,8 @@ Item {
       Text {
         width: parent.width
         text: {
+          if (root.entry.partial === true) return "downloading…"
           var sizeText = Model.humanSize(root.entry.size)
-          if (root.entry.partial === true) return "downloading… · " + sizeText
           return root.ext !== "" ? sizeText + " · ." + root.ext.toUpperCase() : sizeText
         }
         color: root.entry.partial === true ? root.accent : root.dim
@@ -113,6 +113,25 @@ Item {
     anchors.rightMargin: Style.space(6)
     anchors.verticalCenter: parent.verticalCenter
     spacing: Style.space(2)
+
+    // In-progress downloads get a spinner here instead of quick actions —
+    // there's nothing to open/copy/trash yet.
+    Text {
+      visible: root.entry.partial === true
+      anchors.verticalCenter: parent.verticalCenter
+      text: "󱥸"
+      color: root.accent
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.icon
+
+      RotationAnimator on rotation {
+        running: root.entry.partial === true
+        from: 0
+        to: 360
+        duration: 800
+        loops: Animation.Infinite
+      }
+    }
 
     PanelActionButton {
       visible: root.hot && root.actionable
