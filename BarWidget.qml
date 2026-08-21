@@ -311,27 +311,15 @@ Panel {
           width: parent.width
           spacing: Style.space(2)
 
-          Row {
+          Text {
             visible: root.query.trim() === "" && root.visibleEntries.length > 0
             width: parent.width
             bottomPadding: Style.space(4)
-            spacing: Style.space(6)
-
-            Text {
-              text: "󰋚"
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              font.bold: true
-            }
-
-            Text {
-              text: "Recent downloads".toUpperCase()
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              font.bold: true
-            }
+            text: "Recent downloads".toUpperCase()
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            font.bold: true
           }
 
           Repeater {
