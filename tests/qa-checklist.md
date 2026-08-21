@@ -13,8 +13,9 @@ this — these are the interactions only a human can judge.
 
 ## Live tracking
 - [ ] Download a real file in a browser: a downloading row appears (accent color, size ticking)
+- [ ] The downloading row shows a spinning loading icon where the reveal/copy/trash actions normally appear
 - [ ] The bar icon pulses (fades in/out on a loop) while the download is in progress
-- [ ] When it finishes, the row becomes a normal file at the top of the list, and the icon stops pulsing and returns to full opacity
+- [ ] When it finishes, the row becomes a normal file at the top of the list, its spinner is replaced by the usual hover actions, and the bar icon stops pulsing and returns to full opacity
 - [ ] With the panel closed, finishing a download shows the badge dot on the bar icon
 - [ ] Opening the panel clears the badge
 
