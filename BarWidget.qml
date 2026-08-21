@@ -54,7 +54,8 @@ Panel {
 
   readonly property var visibleEntries: {
     if (!service) return []
-    var filtered = Model.filterEntries(query, service.entries)
+    var safeEntries = Model.withoutDownloadPlaceholders(service.entries)
+    var filtered = Model.filterEntries(query, safeEntries)
     return query.trim() === "" ? filtered.slice(0, recentCount) : filtered
   }
 

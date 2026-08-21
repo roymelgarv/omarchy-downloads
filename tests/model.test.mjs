@@ -137,6 +137,28 @@ test("filterEntries returns empty array when nothing matches", () => {
   assert.deepEqual(Model.filterEntries("zzz", [{ name: "a.txt", mtime: 1 }]), []);
 });
 
+// ------------------------------------------------ download placeholders
+
+test("withoutDownloadPlaceholders hides zero-byte files while something is downloading", () => {
+  const entries = [
+    { path: "/a", name: "a.crdownload", size: 1024, partial: true },
+    { path: "/b", name: "a.tar.gz", size: 0, partial: false },
+    { path: "/c", name: "c.txt", size: 500, partial: false }
+  ];
+  const out = Model.withoutDownloadPlaceholders(entries);
+  assert.deepEqual(out.map(e => e.path), ["/a", "/c"]);
+});
+
+test("withoutDownloadPlaceholders keeps zero-byte files when nothing is downloading", () => {
+  const entries = [{ path: "/a", name: "empty.txt", size: 0, partial: false }];
+  assert.deepEqual(Model.withoutDownloadPlaceholders(entries), entries);
+});
+
+test("withoutDownloadPlaceholders never hides the partial entry itself, even at 0 bytes", () => {
+  const entries = [{ path: "/a", name: "a.crdownload", size: 0, partial: true }];
+  assert.deepEqual(Model.withoutDownloadPlaceholders(entries), entries);
+});
+
 // ------------------------------------------------------------ badge logic
 
 test("completedSince reports files that appeared since the previous scan", () => {

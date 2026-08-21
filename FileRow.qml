@@ -95,8 +95,8 @@ Item {
       Text {
         width: parent.width
         text: {
+          if (root.entry.partial === true) return "downloading…"
           var sizeText = Model.humanSize(root.entry.size)
-          if (root.entry.partial === true) return "downloading… · " + sizeText
           return root.ext !== "" ? sizeText + " · ." + root.ext.toUpperCase() : sizeText
         }
         color: root.entry.partial === true ? root.accent : root.dim
@@ -119,7 +119,7 @@ Item {
     Text {
       visible: root.entry.partial === true
       anchors.verticalCenter: parent.verticalCenter
-      text: "󰦖"
+      text: "󱥸"
       color: root.accent
       font.family: root.fontFamily
       font.pixelSize: Style.font.icon

@@ -88,6 +88,21 @@ function filterEntries(query, entries) {
   return scored.map(function (s) { return s.entry; });
 }
 
+// Some browsers (observed with Chrome) reserve the final destination name as
+// a 0-byte placeholder file while the real bytes land in a separately named
+// partial file, only replacing the placeholder once the download finishes.
+// Deleting that placeholder mid-download can break the browser's ability to
+// finish the download, so it must never be shown as a normal, actionable
+// row. We can't reliably derive the placeholder's exact name from the
+// partial file's name (temp-naming schemes vary and can insert random
+// tokens), so instead: whenever anything is downloading, treat any other
+// zero-byte file as a likely placeholder and hide it.
+function withoutDownloadPlaceholders(entries) {
+  var anyDownloading = entries.some(function (e) { return e.partial === true; });
+  if (!anyDownloading) return entries;
+  return entries.filter(function (e) { return e.partial === true || e.size !== 0; });
+}
+
 // Names present now (and complete) that weren't complete in the previous
 // scan — either brand new files or partials that finished. Drives the bar
 // icon badge.
@@ -131,6 +146,7 @@ if (typeof module !== "undefined" && module.exports) {
     sortByMtimeDesc: sortByMtimeDesc,
     searchScore: searchScore,
     filterEntries: filterEntries,
+    withoutDownloadPlaceholders: withoutDownloadPlaceholders,
     completedSince: completedSince,
     elideMiddle: elideMiddle,
     actionToastMessage: actionToastMessage
