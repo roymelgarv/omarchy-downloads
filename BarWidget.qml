@@ -31,9 +31,7 @@ Panel {
   property int cursor: 0
   property var pendingTrash: null
 
-  // Success toast for a completed copy, auto-dismissed. Trash gets its own
-  // inline-in-row confirmation instead (see confirmedRemoval below), since
-  // that row is disappearing and deserves the feedback exactly where it was.
+  // Success toast for a completed quick action (trash/copy), auto-dismissed.
   property string toastMessage: ""
 
   Timer {
@@ -43,46 +41,9 @@ Panel {
     onTriggered: root.toastMessage = ""
   }
 
-  // Snapshot of the entry being trashed, taken at confirm time (while it's
-  // still in visibleEntries) so we know its position once it's gone.
-  property var _trashingEntry: null
-  property int _trashingIndex: 0
-
-  // {entry, index, collapsing} while a trashed row's confirmation is
-  // showing; reconstructed into visibleEntries by Model.withGhostEntry.
-  property var confirmedRemoval: null
-
-  // Hold the "Moved to trash" message, then collapse the row's height
-  // before actually dropping it, so rows below slide up instead of
-  // snapping into place.
-  Timer {
-    id: confirmHoldTimer
-    interval: 850
-    repeat: false
-    onTriggered: {
-      if (root.confirmedRemoval) root.confirmedRemoval = Object.assign({}, root.confirmedRemoval, { collapsing: true })
-      confirmCollapseTimer.restart()
-    }
-  }
-
-  Timer {
-    id: confirmCollapseTimer
-    interval: 150
-    repeat: false
-    onTriggered: root.confirmedRemoval = null
-  }
-
   Connections {
     target: root.service
     function onActionCompleted(action, name, success) {
-      if (action === "trash") {
-        if (success && root._trashingEntry && root._trashingEntry.name === name) {
-          root.confirmedRemoval = { entry: root._trashingEntry, index: root._trashingIndex, collapsing: false }
-          confirmHoldTimer.restart()
-        }
-        root._trashingEntry = null
-        return
-      }
       if (!success) return
       var text = Model.actionToastMessage(action, name)
       if (text === "") return
@@ -94,10 +55,7 @@ Panel {
   readonly property var visibleEntries: {
     if (!service) return []
     var filtered = Model.filterEntries(query, service.entries)
-    var list = query.trim() === "" ? filtered.slice(0, recentCount) : filtered
-    if (!confirmedRemoval) return list
-    var ghost = Object.assign({}, confirmedRemoval.entry, { confirmed: true, collapsing: confirmedRemoval.collapsing === true })
-    return Model.withGhostEntry(list, ghost, confirmedRemoval.index)
+    return query.trim() === "" ? filtered.slice(0, recentCount) : filtered
   }
 
   onVisibleEntriesChanged: if (cursor >= visibleEntries.length) cursor = Math.max(0, visibleEntries.length - 1)
@@ -130,29 +88,20 @@ Panel {
       pendingTrash = null
       toastTimer.stop()
       toastMessage = ""
-      confirmHoldTimer.stop()
-      confirmCollapseTimer.stop()
-      confirmedRemoval = null
-      _trashingEntry = null
       Qt.callLater(function () { searchField.forceActiveFocus() })
     }
   }
 
   function activate(entry) {
-    if (!entry || entry.partial === true || entry.confirmed === true || !service) return
+    if (!entry || entry.partial === true || !service) return
     service.openFile(entry.path)
     root.close()
   }
 
   function requestTrash(entry) {
-    if (!entry || entry.confirmed === true || !service) return
-    if (confirmTrash) {
-      pendingTrash = entry
-    } else {
-      _trashingEntry = entry
-      _trashingIndex = visibleEntries.findIndex(function (e) { return e.path === entry.path })
-      service.trashFile(entry.path)
-    }
+    if (!entry || !service) return
+    if (confirmTrash) pendingTrash = entry
+    else service.trashFile(entry.path)
   }
 
   implicitWidth: button.implicitWidth
@@ -306,63 +255,20 @@ Panel {
 
           Repeater {
             model: root.visibleEntries
-            Item {
-              id: rowSlot
+            FileRow {
               required property var modelData
               required property int index
               width: parent.width
-              height: {
-                if (modelData.confirmed !== true) return Style.space(44)
-                if (modelData.collapsing === true) return 0
-                return Math.max(Style.space(44), confirmText.implicitHeight + Style.space(16))
-              }
-              clip: true
-
-              Behavior on height {
-                NumberAnimation { duration: 150; easing.type: Easing.InQuad }
-              }
-
-              FileRow {
-                anchors.fill: parent
-                visible: rowSlot.modelData.confirmed !== true
-                entry: rowSlot.modelData
-                selected: rowSlot.index === root.cursor
-                foreground: root.foreground
-                accent: Color.accent
-                fontFamily: root.fontFamily
-                onHoveredRow: root.cursor = rowSlot.index
-                onOpenRequested: root.activate(rowSlot.modelData)
-                onRevealRequested: if (root.service) root.service.revealFile(rowSlot.modelData.path)
-                onCopyRequested: if (root.service) root.service.copyFile(rowSlot.modelData.path)
-                onTrashRequested: root.requestTrash(rowSlot.modelData)
-              }
-
-              // Inline confirmation: the row itself becomes the toast for
-              // the file it just lost, instead of a page-level banner.
-              Rectangle {
-                anchors.fill: parent
-                visible: rowSlot.modelData.confirmed === true
-                clip: true
-                radius: Style.space(6)
-                color: Util.alpha(Color.accent, 0.15)
-                border.color: Color.accent
-                border.width: 1
-
-                Text {
-                  id: confirmText
-                  anchors.left: parent.left
-                  anchors.right: parent.right
-                  anchors.verticalCenter: parent.verticalCenter
-                  anchors.leftMargin: Style.space(12)
-                  anchors.rightMargin: Style.space(12)
-                  text: "✓ " + Model.actionToastMessage("trash", rowSlot.modelData.name)
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  wrapMode: Text.WordWrap
-                  horizontalAlignment: Text.AlignLeft
-                }
-              }
+              entry: modelData
+              selected: index === root.cursor
+              foreground: root.foreground
+              accent: Color.accent
+              fontFamily: root.fontFamily
+              onHoveredRow: root.cursor = index
+              onOpenRequested: root.activate(modelData)
+              onRevealRequested: if (root.service) root.service.revealFile(modelData.path)
+              onCopyRequested: if (root.service) root.service.copyFile(modelData.path)
+              onTrashRequested: root.requestTrash(modelData)
             }
           }
 
@@ -430,11 +336,7 @@ Panel {
         fontFamily: root.fontFamily
         onCanceled: root.pendingTrash = null
         onConfirmed: {
-          if (root.service && root.pendingTrash) {
-            root._trashingEntry = root.pendingTrash
-            root._trashingIndex = root.visibleEntries.findIndex(function (e) { return e.path === root.pendingTrash.path })
-            root.service.trashFile(root.pendingTrash.path)
-          }
+          if (root.service && root.pendingTrash) root.service.trashFile(root.pendingTrash.path)
           root.pendingTrash = null
         }
       }
