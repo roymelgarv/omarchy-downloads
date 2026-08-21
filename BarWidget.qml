@@ -165,33 +165,6 @@ Panel {
         width: parent.width
         spacing: Style.space(12)
 
-        // --------------------------------------------------------- toast
-        Rectangle {
-          id: toastBanner
-          width: parent.width
-          height: root.toastMessage !== "" ? implicitHeight : 0
-          implicitHeight: toastText.implicitHeight + Style.space(16)
-          clip: true
-          radius: Style.space(6)
-          color: Util.alpha(Color.accent, 0.15)
-          border.color: Color.accent
-          border.width: 1
-          visible: height > 0
-
-          Behavior on height {
-            NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
-          }
-
-          Text {
-            id: toastText
-            anchors.centerIn: parent
-            text: "✓ " + root.toastMessage
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-          }
-        }
-
         // ---------------------------------------------------------- hero
         PanelHero {
           width: parent.width
@@ -313,6 +286,33 @@ Panel {
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
             horizontalAlignment: Text.AlignHCenter
+          }
+        }
+
+        // --------------------------------------------------------- toast
+        Rectangle {
+          id: toastBanner
+          width: parent.width
+          height: root.toastMessage !== "" ? implicitHeight : 0
+          implicitHeight: toastText.implicitHeight + Style.space(16)
+          clip: true
+          radius: Style.space(6)
+          color: Util.alpha(Color.accent, 0.15)
+          border.color: Color.accent
+          border.width: 1
+          visible: height > 0
+
+          Behavior on height {
+            NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+          }
+
+          Text {
+            id: toastText
+            anchors.centerIn: parent
+            text: "✓ " + root.toastMessage
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
           }
         }
       }
