@@ -292,6 +292,7 @@ Panel {
         // --------------------------------------------------------- toast
         Rectangle {
           id: toastBanner
+          readonly property int horizontalPadding: Style.space(12)
           width: parent.width
           height: root.toastMessage !== "" ? implicitHeight : 0
           implicitHeight: toastText.implicitHeight + Style.space(16)
@@ -308,11 +309,17 @@ Panel {
 
           Text {
             id: toastText
-            anchors.centerIn: parent
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: toastBanner.horizontalPadding
+            anchors.rightMargin: toastBanner.horizontalPadding
             text: "✓ " + root.toastMessage
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignHCenter
           }
         }
       }

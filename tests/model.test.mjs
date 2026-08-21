@@ -173,11 +173,11 @@ test("actionToastMessage formats a copy success message", () => {
   assert.equal(Model.actionToastMessage("copy", "report.pdf"), 'Copied "report.pdf" to clipboard');
 });
 
-test("actionToastMessage elides long file names so the toast stays short", () => {
+test("actionToastMessage keeps the full file name for a long name (banner wraps)", () => {
   const longName = "a-very-long-download-file-name-from-somewhere-important.tar.gz";
   const out = Model.actionToastMessage("trash", longName);
-  assert.ok(out.includes("…"));
-  assert.ok(out.length < longName.length + 20);
+  assert.ok(out.includes(longName));
+  assert.ok(!out.includes("…"));
 });
 
 test("actionToastMessage returns an empty string for an unknown action", () => {

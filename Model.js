@@ -94,11 +94,11 @@ function completedSince(prevNames, currentNames) {
   return out;
 }
 
-// Success-toast copy for a completed quick action. Elided so a long file
-// name can't stretch the banner; unknown actions render nothing (the caller
-// simply skips showing a toast).
+// Success-toast copy for a completed quick action. The full name is kept
+// (the banner wraps to multiple lines) so nothing is hidden; unknown
+// actions render nothing (the caller simply skips showing a toast).
 function actionToastMessage(action, name) {
-  var label = elideMiddle(String(name || ""), 40);
+  var label = String(name || "");
   if (action === "trash") return "Moved \"" + label + "\" to trash";
   if (action === "copy") return "Copied \"" + label + "\" to clipboard";
   return "";
