@@ -9,10 +9,10 @@ Item {
   property var entry: ({})       // {name, path, size, mtime, partial}
   property bool selected: false
   property color foreground: Color.foreground
-  // Has a live default so standalone use works, but a caller that already
-  // computed a dim color should pass it down instead — keeps the
-  // Qt.darker() formula in one place.
-  property color dim: Qt.darker(foreground, 1.55)
+  // The panel derives its own dim tone from the bar's foreground and passes it
+  // in; the theme's muted color is only the standalone fallback, so the
+  // derivation lives in exactly one place (BarWidget).
+  property color dim: Color.muted
   property color accent: Color.accent
   property string fontFamily: Style.font.family
 
@@ -64,10 +64,8 @@ Item {
         id: thumbImage
         anchors.fill: parent
         visible: root.isImage && status === Image.Ready
-        // Qt.resolvedUrl percent-encodes as needed; string concatenation
-        // left "#" truncating the path at a bogus URL fragment and left "%"
-        // ambiguous with percent-encoding, both plausible in a downloaded
-        // filename (e.g. "screenshot #3.png").
+        // Qt.resolvedUrl percent-encodes as needed: a "#" or literal "%" in
+        // the filename ("screenshot #3.png") is not valid in a bare file URL.
         source: root.isImage && root.entry.path ? Qt.resolvedUrl(root.entry.path) : ""
         sourceSize.width: 60
         sourceSize.height: 60
