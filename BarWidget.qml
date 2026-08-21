@@ -115,11 +115,24 @@ Panel {
     iconComponent: Component {
       Item {
         Text {
+          id: iconText
           anchors.centerIn: parent
           text: "󰇚"
           color: (!!root.service && root.service.downloadingCount > 0) ? Color.accent : root.barForeground
           font.family: root.fontFamily
           font.pixelSize: Style.font.icon
+
+          // Pulse while anything is downloading, so an active transfer is
+          // noticeable without opening the panel.
+          SequentialAnimation {
+            id: pulseAnim
+            running: !!root.service && root.service.downloadingCount > 0
+            loops: Animation.Infinite
+            onRunningChanged: if (!running) iconText.opacity = 1.0
+
+            NumberAnimation { target: iconText; property: "opacity"; from: 1.0; to: 0.35; duration: 600; easing.type: Easing.InOutQuad }
+            NumberAnimation { target: iconText; property: "opacity"; from: 0.35; to: 1.0; duration: 600; easing.type: Easing.InOutQuad }
+          }
         }
 
         // Completed-download badge, cleared when any panel opens.
