@@ -97,7 +97,7 @@ Item {
         text: {
           var sizeText = Model.humanSize(root.entry.size)
           if (root.entry.partial === true) return "downloading… · " + sizeText
-          return root.ext !== "" ? "." + root.ext + " · " + sizeText : sizeText
+          return root.ext !== "" ? sizeText + " · ." + root.ext : sizeText
         }
         color: root.entry.partial === true ? root.accent : root.dim
         font.family: root.fontFamily
