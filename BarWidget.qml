@@ -183,10 +183,9 @@ Panel {
         PanelHero {
           width: parent.width
           title: "Downloads"
-          meta: root.service
-            ? Model.humanSize(root.service.totalBytes) + " total · " + root.service.totalCount +
-              (root.service.totalCount === 1 ? " file" : " files")
-            : "Loading…"
+          // Built manually below instead: PanelHero always uppercases meta,
+          // but the status line needs normal sentence case.
+          meta: ""
           foreground: root.foreground
           fontFamily: root.fontFamily
 
@@ -214,16 +213,31 @@ Panel {
           }
         }
 
+        // Status, right under the title (indented to match it).
         Text {
           visible: !!root.service
           width: parent.width
           leftPadding: Style.space(23)
-          text: (root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads").toUpperCase()
+          text: root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads"
           color: root.service && root.service.downloadingCount > 0 ? Color.accent : root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
           font.bold: true
-          font.letterSpacing: 1.2
+          elide: Text.ElideRight
+        }
+
+        // Size/count, flush against the panel's left edge (no indent).
+        Text {
+          visible: !!root.service
+          width: parent.width
+          text: root.service
+            ? Model.humanSize(root.service.totalBytes) + " · " + root.service.totalCount +
+              (root.service.totalCount === 1 ? " file" : " files")
+            : "Loading…"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
           elide: Text.ElideRight
         }
 
