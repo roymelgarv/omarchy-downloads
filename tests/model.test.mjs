@@ -183,3 +183,39 @@ test("actionToastMessage keeps the full file name for a long name (banner wraps)
 test("actionToastMessage returns an empty string for an unknown action", () => {
   assert.equal(Model.actionToastMessage("rename", "report.pdf"), "");
 });
+
+// -------------------------------------------------------- withGhostEntry
+
+test("withGhostEntry replaces an entry still present in the list, keeping its position", () => {
+  const list = [
+    { path: "/a", name: "a.txt" },
+    { path: "/b", name: "b.txt" },
+    { path: "/c", name: "c.txt" }
+  ];
+  const ghost = { path: "/b", name: "b.txt", confirmed: true };
+  const out = Model.withGhostEntry(list, ghost, 1);
+  assert.deepEqual(out.map(e => e.path), ["/a", "/b", "/c"]);
+  assert.equal(out[1].confirmed, true);
+});
+
+test("withGhostEntry inserts the ghost at the given index when the real entry is already gone", () => {
+  const list = [
+    { path: "/a", name: "a.txt" },
+    { path: "/c", name: "c.txt" }
+  ];
+  const ghost = { path: "/b", name: "b.txt", confirmed: true };
+  const out = Model.withGhostEntry(list, ghost, 1);
+  assert.deepEqual(out.map(e => e.path), ["/a", "/b", "/c"]);
+});
+
+test("withGhostEntry clamps an out-of-range index to the end of the list", () => {
+  const list = [{ path: "/a", name: "a.txt" }];
+  const ghost = { path: "/b", name: "b.txt", confirmed: true };
+  const out = Model.withGhostEntry(list, ghost, 99);
+  assert.deepEqual(out.map(e => e.path), ["/a", "/b"]);
+});
+
+test("withGhostEntry returns the list unchanged when there is no ghost", () => {
+  const list = [{ path: "/a", name: "a.txt" }];
+  assert.deepEqual(Model.withGhostEntry(list, null, 0), list);
+});

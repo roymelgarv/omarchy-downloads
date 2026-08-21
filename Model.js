@@ -104,6 +104,20 @@ function actionToastMessage(action, name) {
   return "";
 }
 
+// Splices a "ghost" entry (e.g. a just-trashed file mid-confirmation) into
+// a list at a given position. If the real entry is still in the list (the
+// watcher hasn't caught up to the removal yet), it's replaced in place so
+// the row doesn't jump; otherwise the ghost is inserted at the (clamped)
+// index, reconstructing the position it was removed from.
+function withGhostEntry(list, ghost, index) {
+  if (!ghost) return list;
+  var without = list.filter(function (e) { return e.path !== ghost.path; });
+  var at = Math.max(0, Math.min(index, without.length));
+  var out = without.slice();
+  out.splice(at, 0, ghost);
+  return out;
+}
+
 function elideMiddle(name, max) {
   var s = String(name);
   if (s.length <= max) return s;
@@ -123,6 +137,7 @@ if (typeof module !== "undefined" && module.exports) {
     filterEntries: filterEntries,
     completedSince: completedSince,
     elideMiddle: elideMiddle,
-    actionToastMessage: actionToastMessage
+    actionToastMessage: actionToastMessage,
+    withGhostEntry: withGhostEntry
   };
 }
