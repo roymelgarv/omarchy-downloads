@@ -179,69 +179,70 @@ Panel {
         width: parent.width
         spacing: Style.space(12)
 
-        // ------------------------------------------------- hero + status
-        // Grouped in their own tightly-spaced Column so the status line
-        // reads as directly attached to the title, not floating below it
-        // at the outer Column's wider spacing.
-        Column {
+        // ---------------------------------------------------------- hero
+        // Built manually rather than via PanelHero: its icon only centers
+        // against its own title+meta pairing, and meta always renders
+        // uppercase — neither works once the status line needs sentence
+        // case, so the icon and both lines of text are laid out here
+        // directly, icon centered against the title+status pair as a whole.
+        Item {
           width: parent.width
-          spacing: Style.space(2)
+          implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, openButton.implicitHeight)
 
-          PanelHero {
-            width: parent.width
-            title: "Downloads"
-            // Built manually below instead: PanelHero always uppercases
-            // meta, but the status line needs normal sentence case.
-            meta: ""
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-
-            iconComponent: Component {
-              Text {
-                text: "󰇚"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.display
-              }
-            }
-
-            trailingControl: Component {
-              Button {
-                text: "Open"
-                tooltipText: "Open the folder in the file manager"
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                bordered: true
-                onClicked: {
-                  if (root.service) root.service.openFolder()
-                  root.close()
-                }
-              }
-            }
-          }
-
-          // Invisible twin of the hero icon, purely to measure its real
-          // rendered width — PanelHero doesn't expose the icon's own
-          // geometry, and a glyph's width isn't its font pixel size.
           Text {
-            id: iconWidthRef
-            visible: false
+            id: heroIcon
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
             text: "󰇚"
+            color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.display
           }
 
-          // Status, right under the title (indented to match it).
-          Text {
-            visible: !!root.service
-            width: parent.width
-            leftPadding: iconWidthRef.implicitWidth + Style.space(14)
-            text: root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads"
-            color: root.service && root.service.downloadingCount > 0 ? Color.accent : root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.bold: true
-            elide: Text.ElideRight
+          Column {
+            id: heroLabels
+            anchors.left: heroIcon.right
+            anchors.leftMargin: Style.space(14)
+            anchors.right: openButton.left
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(2)
+
+            Text {
+              width: parent.width
+              text: "Downloads"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.title
+              font.bold: true
+              elide: Text.ElideRight
+            }
+
+            Text {
+              visible: !!root.service
+              width: parent.width
+              text: root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads"
+              color: root.service && root.service.downloadingCount > 0 ? Color.accent : root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+              elide: Text.ElideRight
+            }
+          }
+
+          Button {
+            id: openButton
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Open"
+            tooltipText: "Open the folder in the file manager"
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            bordered: true
+            onClicked: {
+              if (root.service) root.service.openFolder()
+              root.close()
+            }
           }
         }
 
