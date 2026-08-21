@@ -25,8 +25,9 @@ Item {
   readonly property bool isImage: ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"].indexOf(ext) !== -1
   readonly property bool hot: mouse.containsMouse || selected
   readonly property bool actionable: !(entry.partial === true)
+  readonly property bool showTypeChip: entry.partial !== true && ext !== ""
 
-  implicitHeight: Style.space(44)
+  implicitHeight: Math.max(Style.space(44), metaColumn.implicitHeight + Style.space(16))
 
   Rectangle {
     anchors.fill: parent
@@ -79,6 +80,7 @@ Item {
     }
 
     Column {
+      id: metaColumn
       width: parent.width - Style.space(40)
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(2)
@@ -92,45 +94,34 @@ Item {
         elide: Text.ElideMiddle
       }
 
-      Item {
+      Text {
         width: parent.width
-        height: Math.max(sizeText.implicitHeight, typeChip.visible ? typeChip.height : 0)
+        text: root.entry.partial === true
+          ? "downloading… · " + Model.humanSize(root.entry.size)
+          : Model.humanSize(root.entry.size)
+        color: root.entry.partial === true ? root.accent : root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        elide: Text.ElideRight
+      }
+
+      // Type chip on its own line below the size: sharp corners,
+      // background/text inverted from the row's own palette so it stays
+      // readable across theme switches.
+      Rectangle {
+        visible: root.showTypeChip
+        radius: 0
+        color: root.foreground
+        width: chipText.implicitWidth + Style.space(8)
+        height: chipText.implicitHeight + Style.space(2)
 
         Text {
-          id: sizeText
-          anchors.left: parent.left
-          anchors.right: typeChip.visible ? typeChip.left : parent.right
-          anchors.rightMargin: typeChip.visible ? Style.space(6) : 0
-          anchors.verticalCenter: parent.verticalCenter
-          text: root.entry.partial === true
-            ? "downloading… · " + Model.humanSize(root.entry.size)
-            : Model.humanSize(root.entry.size)
-          color: root.entry.partial === true ? root.accent : root.dim
+          id: chipText
+          anchors.centerIn: parent
+          text: "." + root.ext
+          color: Color.background
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
-          elide: Text.ElideRight
-        }
-
-        // Type chip: sharp corners, background/text inverted from the
-        // row's own palette so it stays readable across themes.
-        Rectangle {
-          id: typeChip
-          visible: root.entry.partial !== true && root.ext !== ""
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          radius: 0
-          color: root.foreground
-          width: chipText.implicitWidth + Style.space(8)
-          height: chipText.implicitHeight + Style.space(2)
-
-          Text {
-            id: chipText
-            anchors.centerIn: parent
-            text: "." + root.ext
-            color: Color.background
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
         }
       }
     }
