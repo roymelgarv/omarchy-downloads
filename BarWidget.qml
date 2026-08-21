@@ -185,8 +185,7 @@ Panel {
           title: "Downloads"
           meta: root.service
             ? Model.humanSize(root.service.totalBytes) + " total · " + root.service.totalCount +
-              (root.service.totalCount === 1 ? " file" : " files") +
-              (root.service.downloadingCount > 0 ? " · " + root.service.downloadingCount + " downloading" : "")
+              (root.service.totalCount === 1 ? " file" : " files")
             : "Loading…"
           foreground: root.foreground
           fontFamily: root.fontFamily
@@ -213,6 +212,19 @@ Panel {
               }
             }
           }
+        }
+
+        Text {
+          visible: !!root.service
+          width: parent.width
+          leftPadding: Style.space(23)
+          text: (root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads").toUpperCase()
+          color: root.service && root.service.downloadingCount > 0 ? Color.accent : root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+          font.letterSpacing: 1.2
+          elide: Text.ElideRight
         }
 
         // -------------------------------------------------------- search
