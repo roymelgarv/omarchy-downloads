@@ -3,8 +3,8 @@ import qs.Commons
 import qs.Ui
 import "Model.js" as Model
 
-// One downloads-list row: thumbnail (images) or extension chip, name + size,
-// and hover/selection-revealed quick actions.
+// One downloads-list row: thumbnail (images) or type glyph, name with its
+// type + size below it, and hover/selection-revealed quick actions.
 Item {
   id: root
 
@@ -85,7 +85,7 @@ Item {
 
       Text {
         width: parent.width
-        text: root.entry.name || ""
+        text: Model.baseName(root.entry.name || "")
         color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
@@ -94,9 +94,11 @@ Item {
 
       Text {
         width: parent.width
-        text: root.entry.partial === true
-          ? "downloading… · " + Model.humanSize(root.entry.size)
-          : Model.humanSize(root.entry.size)
+        text: {
+          var sizeText = Model.humanSize(root.entry.size)
+          if (root.entry.partial === true) return "downloading… · " + sizeText
+          return root.ext !== "" ? "." + root.ext + " · " + sizeText : sizeText
+        }
         color: root.entry.partial === true ? root.accent : root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
@@ -111,28 +113,6 @@ Item {
     anchors.rightMargin: Style.space(6)
     anchors.verticalCenter: parent.verticalCenter
     spacing: Style.space(2)
-
-    // Extension chip, mockup-style; hidden while hovering to make room for
-    // the action icons on narrow rows.
-    Rectangle {
-      visible: root.ext !== "" && !root.hot
-      anchors.verticalCenter: parent.verticalCenter
-      width: chipText.implicitWidth + Style.space(10)
-      height: chipText.implicitHeight + Style.space(4)
-      radius: Style.cornerRadius
-      color: "transparent"
-      border.color: Util.alpha(root.foreground, 0.38)
-      border.width: 1
-
-      Text {
-        id: chipText
-        anchors.centerIn: parent
-        text: "." + root.ext
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-      }
-    }
 
     PanelActionButton {
       visible: root.hot && root.actionable
