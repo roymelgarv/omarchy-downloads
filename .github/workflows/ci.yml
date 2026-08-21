@@ -42,7 +42,12 @@ jobs:
           fi
 
       - name: ShellCheck
-        run: shellcheck bin/* scripts/*.sh
+        # -x follows sourced files; -P SCRIPTDIR resolves them relative to the
+        # sourcing script's own directory, which is how bin/* locate lib.sh
+        # ($(dirname "${BASH_SOURCE[0]}")/lib.sh). Without both, lib.sh is
+        # unresolvable and SC1091 fails the build. This lints lib.sh's contents
+        # in context rather than merely silencing the warning.
+        run: shellcheck -x -P SCRIPTDIR bin/* scripts/*.sh
 
       - name: Install bats (pinned)
         run: |
