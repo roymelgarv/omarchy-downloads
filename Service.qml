@@ -47,33 +47,16 @@ Item {
 
   // Badge: a download finished (or a file appeared) while no panel was open.
   property bool hasNewCompleted: false
-  // Derived from the registered panels themselves (not a flag one panel sets
-  // on open/close): with one panel per monitor, a flag last written by
-  // whichever panel changed most recently goes stale the moment a second
-  // monitor's panel closes while the first is still open.
-  readonly property bool anyPanelOpen: _panels.some(function (p) { return p.opened === true })
+  readonly property bool anyPanelOpen: registry.anyOpen
   property var _prevNames: null // null = first scan, never badge for it
 
   onAnyPanelOpenChanged: if (anyPanelOpen) hasNewCompleted = false
   onFolderChanged: { _prevNames = null; hasNewCompleted = false; lastError = "" }
 
-  // Bar-widget panels (one per monitor) register so IPC has a panel to act
-  // on. Named for what it actually is — whichever panel registered first —
-  // not "the primary monitor's panel", which this doesn't attempt to resolve.
-  property var _panels: []
-  readonly property var _firstPanel: _panels.length > 0 ? _panels[0] : null
+  PanelRegistry { id: registry }
 
-  function registerPanel(panel) {
-    if (_panels.indexOf(panel) === -1) _panels = _panels.concat([panel])
-  }
-
-  function unregisterPanel(panel) {
-    var at = _panels.indexOf(panel)
-    if (at === -1) return
-    var next = _panels.slice()
-    next.splice(at, 1)
-    _panels = next
-  }
+  function registerPanel(panel) { registry.register(panel) }
+  function unregisterPanel(panel) { registry.unregister(panel) }
 
   FolderListModel {
     id: files
@@ -93,7 +76,7 @@ Item {
   }
 
   // Collapse bursts of watcher events (a finishing download fires several)
-  // into one rebuild + one stats run.
+  // into a single rebuild.
   Timer {
     id: resyncDebounce
     interval: 250
@@ -104,9 +87,9 @@ Item {
   function scheduleResync() { resyncDebounce.restart() }
 
   // While a download is in flight the watcher only reports size changes as
-  // dataChanged on existing rows; poll lightly so the partial's size and the
-  // totals stay honest, and so the suffix-rename that some browsers do
-  // (foo.part -> foo) is never missed.
+  // dataChanged on existing rows; poll lightly so the partial's own size stays
+  // honest, and so the suffix-rename that some browsers do (foo.part -> foo)
+  // is never missed.
   Timer {
     interval: 2000
     repeat: true
@@ -129,14 +112,52 @@ Item {
       })
       names.push(name)
     }
-    entries = Model.sortByMtimeDesc(out)
+
+    // Only republish when something actually changed. Reassigning `entries`
+    // hands every bound ListView a new model, which resets its scroll
+    // position and re-requests every thumbnail — watcher events fire for
+    // plenty of reasons that leave this list identical.
+    var next = Model.sortByMtimeDesc(out)
+    var entriesChanged = !Model.entriesEqual(entries, next)
+    if (entriesChanged) entries = next
+
+    var namesChanged = !Model.namesEqual(_prevNames, names)
 
     if (_prevNames !== null && badgeOnComplete && !anyPanelOpen &&
         Model.completedSince(_prevNames, names).length > 0)
       hasNewCompleted = true
     _prevNames = names
 
-    statsDebounce.restart()
+    // The totals come from a recursive walk of the whole tree, so the two
+    // kinds of change get different urgency. A file appearing, vanishing, or
+    // being renamed moves the visible count and is worth walking for right
+    // away; a size-only change only nudges the byte total, so it is left to
+    // the slow refresh below rather than re-walking the folder every 2s poll.
+    if (namesChanged) {
+      _statsStale = false
+      statsDebounce.restart()
+    } else if (entriesChanged) {
+      _statsStale = true
+    }
+  }
+
+  // Catches the byte total up when no file came or went, on a slow cadence.
+  //
+  // `downloadingCount > 0` has to be its own trigger rather than relying on
+  // _statsStale: FolderListModel does not re-stat a growing file on every
+  // poll, so a download in flight can leave `entries` byte-identical from one
+  // resync to the next while the bytes on disk keep climbing. The partial
+  // suffix is a name, not a size, so it stays a reliable signal either way.
+  // An idle folder matches neither condition and never walks the tree.
+  property bool _statsStale: false
+  Timer {
+    interval: 10000
+    repeat: true
+    running: root._statsStale || root.downloadingCount > 0
+    onTriggered: {
+      root._statsStale = false
+      statsDebounce.restart()
+    }
   }
 
   Timer {
@@ -186,72 +207,27 @@ Item {
     Quickshell.execDetached(["bash", pluginDir + "/bin/downloads-reveal", folder])
   }
 
-  function copyFile(path) {
-    runAction("copy", path)
-  }
+  function copyFile(path) { actions.run("copy", path) }
+  function trashFile(path) { actions.run("trash", path) }
 
-  function trashFile(path) {
-    runAction("trash", path)
-  }
-
-  // Fired after copy/trash finishes, success or not, so the widget can show
-  // a confirmation toast. `name` is derived from the path (not `entries`,
-  // which may already have been rebuilt by the time the process exits).
+  // Re-emitted from the runner so widgets have one thing to connect to.
   signal actionCompleted(string action, string name, bool success)
 
-  property string _pendingAction: ""
-  property string _pendingName: ""
-  property bool _actionRunning: false
-  // FIFO of {action, path} — copy/trash share one Process (both are
-  // near-instant, and a shared instance means a single place turns a nonzero
-  // exit into lastError), so a second quick action fired before the first's
-  // process exits is queued rather than clobbering _pendingAction/
-  // _pendingName and silently no-oping on the already-running Process.
-  property var _actionQueue: []
-
-  function runAction(action, path) {
-    _actionQueue.push({ action: action, path: path })
-    _runNextQueuedAction()
-  }
-
-  function _runNextQueuedAction() {
-    if (_actionRunning || _actionQueue.length === 0) return
-    var next = _actionQueue.shift()
-    _pendingAction = next.action
-    _pendingName = String(next.path).split("/").pop()
-    _actionRunning = true
-    actionProcess.command = ["bash", pluginDir + "/bin/downloads-" + next.action, next.path]
-    actionProcess.running = true
-  }
-
-  property Process actionProcess: Process {
-    running: false
-    command: []
-    // Read only from onExited, not from this collector's own
-    // onStreamFinished: Process/StdioCollector don't guarantee stderr closes
-    // before onExited fires, so setting lastError here and clearing it
-    // separately in onExited raced. `text` is stable by the time onExited
-    // runs because waitForEnd holds the collector open until the stream
-    // closes.
-    stderr: StdioCollector {
-      id: actionStderr
-      waitForEnd: true
-    }
-    onExited: function (exitCode) {
-      var success = exitCode === 0
-      root.lastError = success ? "" : String(actionStderr.text).trim()
-      root.actionCompleted(root._pendingAction, root._pendingName, success)
-      root._actionRunning = false
+  ActionRunner {
+    id: actions
+    pluginDir: root.pluginDir
+    onFinished: function (action, name, success) {
+      root.lastError = actions.lastError
+      root.actionCompleted(action, name, success)
       root.scheduleResync()
-      root._runNextQueuedAction()
     }
   }
 
   IpcHandler {
     target: "downloads"
-    function open(): void { if (root._firstPanel) root._firstPanel.open() }
-    function close(): void { if (root._firstPanel) root._firstPanel.close() }
-    function toggle(): void { if (root._firstPanel) root._firstPanel.toggle() }
+    function open(): void { if (registry.first) registry.first.open() }
+    function close(): void { if (registry.first) registry.first.close() }
+    function toggle(): void { if (registry.first) registry.first.toggle() }
     function status(): string {
       return JSON.stringify({
         folder: root.folder,
@@ -259,7 +235,7 @@ Item {
         bytes: root.totalBytes,
         downloading: root.downloadingCount,
         badge: root.hasNewCompleted,
-        panels: root._panels.length
+        panels: registry.count
       })
     }
   }
