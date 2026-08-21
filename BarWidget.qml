@@ -220,11 +220,22 @@ Panel {
             }
           }
 
+          // Invisible twin of the hero icon, purely to measure its real
+          // rendered width — PanelHero doesn't expose the icon's own
+          // geometry, and a glyph's width isn't its font pixel size.
+          Text {
+            id: iconWidthRef
+            visible: false
+            text: "󰇚"
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.display
+          }
+
           // Status, right under the title (indented to match it).
           Text {
             visible: !!root.service
             width: parent.width
-            leftPadding: Style.space(23)
+            leftPadding: iconWidthRef.implicitWidth + Style.space(14)
             text: root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads"
             color: root.service && root.service.downloadingCount > 0 ? Color.accent : root.dim
             font.family: root.fontFamily
