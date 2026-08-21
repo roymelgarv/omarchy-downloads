@@ -11,6 +11,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 - File names no longer repeat the extension; each row now shows the size and type together below the name (e.g. "130.8 KB · .PNG").
+- Default recent-file count raised from 5 to 7, using space the panel already had.
+
+### Fixed
+- Search results past the eighth match were drawn outside the popout card, leaving them unreachable by mouse and keyboard. The file list now scrolls once it exceeds eight rows, and arrow-key navigation keeps the selected row in view.
 
 ## [0.1.0] - 2026-08-20
 

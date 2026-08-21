@@ -31,7 +31,7 @@
         "type": "integer",
         "label": "Recent files shown",
         "description": "How many recent files to list when not searching.",
-        "defaultValue": 5,
+        "defaultValue": 7,
         "min": 3,
         "max": 15
       },

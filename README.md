@@ -40,7 +40,7 @@ Right-click the widget (or use the bar settings UI) to change:
 | Setting | Default | Description |
 |---|---|---|
 | Folder to watch | `~/Downloads` | Any folder works — it's just a folder widget at heart. |
-| Recent files shown | 5 | List length when not searching (3–15). |
+| Recent files shown | 7 | List length when not searching (3–15). |
 | Badge on new downloads | on | Dot on the bar icon when a download finishes while the panel is closed. |
 | Confirm before trashing | on | Skip the confirmation dialog if you like to live dangerously (trash is still recoverable). |
 

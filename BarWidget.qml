@@ -27,11 +27,21 @@ Panel {
   // Clamped to the manifest schema's declared min/max: the shell hands back
   // whatever value is stored without re-validating it against the schema.
   readonly property int recentCount: {
-    var n = Number(setting("recentCount", 5))
-    if (!isFinite(n)) n = 5
+    var n = Number(setting("recentCount", 7))
+    if (!isFinite(n)) n = 7
     return Math.max(3, Math.min(15, Math.round(n)))
   }
   readonly property bool confirmTrash: setting("confirmTrash", true)
+
+  // How many rows the list shows before it starts scrolling. Eight is what
+  // fits: the card is capped at Style.space(560) and the chrome above the list
+  // (hero, totals, separator, search field, section header, Column spacings)
+  // eats ~184 of it, leaving room for 8 rows at Style.space(44) plus spacing.
+  // Everything here scales through Style.space(), so the count holds across
+  // themes with a different spacing or font scale.
+  readonly property int maxVisibleRows: 8
+  readonly property real maxListHeight:
+    Style.space(44) * maxVisibleRows + Style.space(2) * (maxVisibleRows - 1)
 
   property string query: ""
   property int cursor: 0
@@ -273,6 +283,11 @@ Panel {
           onTextChanged: {
             root.query = text
             root.cursor = 0
+            // Reset scroll on a new query specifically, not on every
+            // visibleEntries recompute — the folder watcher republishes the
+            // list on any file change, which would yank a scrolled list back
+            // to the top while the user is reading it.
+            fileList.positionViewAtBeginning()
           }
           Keys.onPressed: function (event) {
             if (root.pendingTrash !== null) {
@@ -323,12 +338,32 @@ Panel {
             font.bold: true
           }
 
-          Repeater {
+          // A ListView rather than a Repeater because search ignores
+          // recentCount and returns every match: a Column of unbounded height
+          // is silently cut off by the card's height cap, leaving matches
+          // unreachable by mouse *and* keyboard. Capping the view's height
+          // makes the overflow scroll, and ListView's positionViewAtIndex is
+          // what keeps the keyboard cursor inside the viewport.
+          ListView {
+            id: fileList
+            width: parent.width
+            height: Math.min(contentHeight, root.maxListHeight)
+            spacing: Style.space(2)
+            clip: true
+            // Rubber-band overscroll reads as a glitch in a small popout card.
+            boundsBehavior: Flickable.StopAtBounds
             model: root.visibleEntries
-            FileRow {
+            currentIndex: root.cursor
+            // ListView.Contain scrolls only when the row is actually outside
+            // the viewport, so arrowing within view doesn't jump the list.
+            onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
+
+            delegate: FileRow {
               required property var modelData
               required property int index
-              width: parent.width
+              // A delegate's parent is the internal content item, not the
+              // view, so parent.width would be wrong here.
+              width: ListView.view.width
               entry: modelData
               selected: index === root.cursor
               foreground: root.foreground
