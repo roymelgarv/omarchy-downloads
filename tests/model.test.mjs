@@ -37,6 +37,18 @@ test("extOf returns empty string for files without extension or dotfiles", () =>
   assert.equal(Model.extOf(".bashrc"), "");
 });
 
+// -------------------------------------------------------------- baseName
+
+test("baseName strips the extension shown separately as the file's type", () => {
+  assert.equal(Model.baseName("report.pdf"), "report");
+  assert.equal(Model.baseName("archive.tar.gz"), "archive.tar");
+});
+
+test("baseName leaves files without an extension or dotfiles untouched", () => {
+  assert.equal(Model.baseName("Makefile"), "Makefile");
+  assert.equal(Model.baseName(".bashrc"), ".bashrc");
+});
+
 // ------------------------------------------------------- partial downloads
 
 test("isPartialDownload detects browser partial-download suffixes", () => {

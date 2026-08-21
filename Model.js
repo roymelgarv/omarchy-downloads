@@ -24,6 +24,15 @@ function extOf(name) {
   return String(name).slice(at + 1).toLowerCase();
 }
 
+// Name with its extension stripped, for display next to a separate type
+// label so the extension isn't shown twice.
+function baseName(name) {
+  var s = String(name);
+  var at = s.lastIndexOf(".");
+  if (at <= 0) return s; // no dot, or dotfile like ".bashrc"
+  return s.slice(0, at);
+}
+
 function partialSuffixOf(name) {
   var lower = String(name).toLowerCase();
   for (var i = 0; i < PARTIAL_SUFFIXES.length; i++) {
@@ -116,6 +125,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     humanSize: humanSize,
     extOf: extOf,
+    baseName: baseName,
     isPartialDownload: isPartialDownload,
     finalNameOf: finalNameOf,
     sortByMtimeDesc: sortByMtimeDesc,
