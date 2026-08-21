@@ -261,6 +261,8 @@ Panel {
           elide: Text.ElideRight
         }
 
+        PanelSeparator { foreground: root.foreground }
+
         // -------------------------------------------------------- search
         TextField {
           id: searchField
@@ -306,8 +308,6 @@ Panel {
           wrapMode: Text.WordWrap
         }
 
-        PanelSeparator { foreground: root.foreground }
-
         // ---------------------------------------------------------- list
         Column {
           width: parent.width
@@ -328,7 +328,7 @@ Panel {
             }
 
             Text {
-              text: "Latest downloads"
+              text: "Recent downloads"
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
