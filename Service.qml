@@ -13,7 +13,12 @@ import "Model.js" as Model
 Item {
   id: root
 
-  readonly property string pluginDir: String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "").replace(/\/$/, "")
+  // decodeURIComponent matters here: Qt.resolvedUrl percent-encodes special
+  // characters (a checkout path containing a space becomes %20), and this
+  // value is spliced straight into bash argv for every bin/ invocation — an
+  // un-decoded %20 there is a literal three-character path segment, not a
+  // space, and every helper script fails to find itself.
+  readonly property string pluginDir: decodeURIComponent(String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "")).replace(/\/$/, "")
   readonly property string home: Quickshell.env("HOME") || ""
 
   // Settings live on the bar widget (manifest schema); the widget pushes them
@@ -42,15 +47,21 @@ Item {
 
   // Badge: a download finished (or a file appeared) while no panel was open.
   property bool hasNewCompleted: false
-  property bool anyPanelOpen: false
+  // Derived from the registered panels themselves (not a flag one panel sets
+  // on open/close): with one panel per monitor, a flag last written by
+  // whichever panel changed most recently goes stale the moment a second
+  // monitor's panel closes while the first is still open.
+  readonly property bool anyPanelOpen: _panels.some(function (p) { return p.opened === true })
   property var _prevNames: null // null = first scan, never badge for it
 
   onAnyPanelOpenChanged: if (anyPanelOpen) hasNewCompleted = false
-  onFolderChanged: { _prevNames = null; hasNewCompleted = false }
+  onFolderChanged: { _prevNames = null; hasNewCompleted = false; lastError = "" }
 
-  // Bar-widget panels (one per monitor) register so IPC has a panel to act on.
+  // Bar-widget panels (one per monitor) register so IPC has a panel to act
+  // on. Named for what it actually is — whichever panel registered first —
+  // not "the primary monitor's panel", which this doesn't attempt to resolve.
   property var _panels: []
-  readonly property var _primaryPanel: _panels.length > 0 ? _panels[0] : null
+  readonly property var _firstPanel: _panels.length > 0 ? _panels[0] : null
 
   function registerPanel(panel) {
     if (_panels.indexOf(panel) === -1) _panels = _panels.concat([panel])
@@ -66,7 +77,10 @@ Item {
 
   FolderListModel {
     id: files
-    folder: "file://" + root.folder
+    // Qt.resolvedUrl percent-encodes as needed (a "#" or literal "%" in the
+    // folder name would otherwise land in the URL unescaped, or worse — "#"
+    // would truncate the path at a bogus fragment).
+    folder: Qt.resolvedUrl(root.folder)
     showDirs: false
     showHidden: false
     showOnlyReadable: true
@@ -130,6 +144,11 @@ Item {
     interval: 800
     repeat: false
     onTriggered: {
+      // A previous run outlived the debounce window (slow disk, huge
+      // folder); reassigning `command`/`running` on an already-running
+      // Process is a no-op, so retry instead of silently dropping this
+      // update.
+      if (statsProcess.running) { statsDebounce.restart(); return }
       statsProcess.command = ["bash", root.pluginDir + "/bin/downloads-stats", root.folder]
       statsProcess.running = true
     }
@@ -146,13 +165,14 @@ Item {
           root.totalBytes = Number(parsed.bytes) || 0
           root.totalCount = Number(parsed.count) || 0
         } catch (e) {
-          // stale folder mid-switch; next resync corrects it
+          // stale folder mid-switch; next resync corrects it, but leaving no
+          // trace at all makes a genuinely broken downloads-stats output
+          // indistinguishable from this expected case.
+          console.warn("omarchy-downloads: failed to parse downloads-stats output:", e)
         }
       }
     }
   }
-
-  // ------------------------------------------------------------- actions
 
   function openFile(path) {
     Quickshell.execDetached(["xdg-open", path])
@@ -181,36 +201,57 @@ Item {
 
   property string _pendingAction: ""
   property string _pendingName: ""
+  property bool _actionRunning: false
+  // FIFO of {action, path} — copy/trash share one Process (both are
+  // near-instant, and a shared instance means a single place turns a nonzero
+  // exit into lastError), so a second quick action fired before the first's
+  // process exits is queued rather than clobbering _pendingAction/
+  // _pendingName and silently no-oping on the already-running Process.
+  property var _actionQueue: []
 
   function runAction(action, path) {
-    _pendingAction = action
-    _pendingName = String(path).split("/").pop()
-    actionProcess.command = ["bash", pluginDir + "/bin/downloads-" + action, path]
+    _actionQueue.push({ action: action, path: path })
+    _runNextQueuedAction()
+  }
+
+  function _runNextQueuedAction() {
+    if (_actionRunning || _actionQueue.length === 0) return
+    var next = _actionQueue.shift()
+    _pendingAction = next.action
+    _pendingName = String(next.path).split("/").pop()
+    _actionRunning = true
+    actionProcess.command = ["bash", pluginDir + "/bin/downloads-" + next.action, next.path]
     actionProcess.running = true
   }
 
-  // Copy and trash share one Process: both are near-instant, and a shared
-  // instance means a single place turns a nonzero exit into lastError.
   property Process actionProcess: Process {
     running: false
     command: []
+    // Read only from onExited, not from this collector's own
+    // onStreamFinished: Process/StdioCollector don't guarantee stderr closes
+    // before onExited fires, so setting lastError here and clearing it
+    // separately in onExited raced. `text` is stable by the time onExited
+    // runs because waitForEnd holds the collector open until the stream
+    // closes.
     stderr: StdioCollector {
+      id: actionStderr
       waitForEnd: true
-      onStreamFinished: root.lastError = String(text).trim()
     }
     onExited: function (exitCode) {
       var success = exitCode === 0
-      if (success) root.lastError = ""
+      root.lastError = success ? "" : String(actionStderr.text).trim()
       root.actionCompleted(root._pendingAction, root._pendingName, success)
+      root._actionRunning = false
       root.scheduleResync()
+      root._runNextQueuedAction()
     }
   }
 
   IpcHandler {
     target: "downloads"
-    function open(): void { if (root._primaryPanel) root._primaryPanel.open() }
-    function close(): void { if (root._primaryPanel) root._primaryPanel.close() }
-    function toggle(): void { if (root._primaryPanel) root._primaryPanel.toggle() }
+    function open(): void { if (root._firstPanel) root._firstPanel.open() }
+    function close(): void { if (root._firstPanel) root._firstPanel.close() }
+    function toggle(): void { if (root._firstPanel) root._firstPanel.toggle() }
     function status(): string {
       return JSON.stringify({
         folder: root.folder,

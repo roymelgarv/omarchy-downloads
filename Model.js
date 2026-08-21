@@ -4,6 +4,7 @@
 // unit-testable without a running shell.
 
 var PARTIAL_SUFFIXES = [".part", ".crdownload", ".download"];
+var IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"];
 
 function humanSize(bytes) {
   var n = Number(bytes);
@@ -24,13 +25,15 @@ function extOf(name) {
   return String(name).slice(at + 1).toLowerCase();
 }
 
-// Name with its extension stripped, for display next to a separate type
-// label so the extension isn't shown twice.
 function baseName(name) {
   var s = String(name);
   var at = s.lastIndexOf(".");
   if (at <= 0) return s; // no dot, or dotfile like ".bashrc"
   return s.slice(0, at);
+}
+
+function isImageExt(ext) {
+  return IMAGE_EXTENSIONS.indexOf(String(ext).toLowerCase()) !== -1;
 }
 
 function partialSuffixOf(name) {
@@ -103,9 +106,6 @@ function withoutDownloadPlaceholders(entries) {
   return entries.filter(function (e) { return e.partial === true || e.size !== 0; });
 }
 
-// Names present now (and complete) that weren't complete in the previous
-// scan — either brand new files or partials that finished. Drives the bar
-// icon badge.
 function completedSince(prevNames, currentNames) {
   var prev = {};
   for (var i = 0; i < prevNames.length; i++) prev[prevNames[i]] = true;
@@ -118,9 +118,8 @@ function completedSince(prevNames, currentNames) {
   return out;
 }
 
-// Success-toast copy for a completed quick action. The full name is kept
-// (the banner wraps to multiple lines) so nothing is hidden; unknown
-// actions render nothing (the caller simply skips showing a toast).
+// Full name is kept, not elided — the toast banner wraps instead of hiding
+// part of the name.
 function actionToastMessage(action, name) {
   var label = String(name || "");
   if (action === "trash") return "Moved \"" + label + "\" to trash";
@@ -131,6 +130,9 @@ function actionToastMessage(action, name) {
 function elideMiddle(name, max) {
   var s = String(name);
   if (s.length <= max) return s;
+  // Below 4 chars there's no room for an ellipsis plus text on both sides;
+  // just truncate from the start.
+  if (max < 4) return s.slice(0, Math.max(0, max));
   var keepEnd = Math.min(12, Math.floor((max - 1) / 2));
   var keepStart = max - 1 - keepEnd;
   return s.slice(0, keepStart) + "…" + s.slice(s.length - keepEnd);
@@ -140,6 +142,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     humanSize: humanSize,
     extOf: extOf,
+    isImageExt: isImageExt,
     baseName: baseName,
     isPartialDownload: isPartialDownload,
     finalNameOf: finalNameOf,

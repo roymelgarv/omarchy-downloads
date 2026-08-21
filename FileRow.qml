@@ -3,14 +3,16 @@ import qs.Commons
 import qs.Ui
 import "Model.js" as Model
 
-// One downloads-list row: thumbnail (images) or type glyph, name with its
-// size and type below it, and hover/selection-revealed quick actions.
 Item {
   id: root
 
   property var entry: ({})       // {name, path, size, mtime, partial}
   property bool selected: false
   property color foreground: Color.foreground
+  // Has a live default so standalone use works, but a caller that already
+  // computed a dim color should pass it down instead — keeps the
+  // Qt.darker() formula in one place.
+  property color dim: Qt.darker(foreground, 1.55)
   property color accent: Color.accent
   property string fontFamily: Style.font.family
 
@@ -20,9 +22,8 @@ Item {
   signal trashRequested()
   signal hoveredRow()
 
-  readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string ext: Model.extOf(entry.name || "")
-  readonly property bool isImage: ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"].indexOf(ext) !== -1
+  readonly property bool isImage: Model.isImageExt(ext)
   readonly property bool hot: mouse.containsMouse || selected
   readonly property bool actionable: !(entry.partial === true)
 
@@ -44,6 +45,7 @@ Item {
   }
 
   Row {
+    id: contentRow
     anchors.left: parent.left
     anchors.right: actions.left
     anchors.leftMargin: Style.space(8)
@@ -51,26 +53,35 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     spacing: Style.space(10)
 
-    // Thumbnail for images, glyph for everything else.
+    readonly property int thumbSize: Style.space(30)
+
     Item {
-      width: Style.space(30)
-      height: Style.space(30)
+      width: contentRow.thumbSize
+      height: contentRow.thumbSize
       anchors.verticalCenter: parent.verticalCenter
 
       Image {
+        id: thumbImage
         anchors.fill: parent
         visible: root.isImage && status === Image.Ready
-        source: root.isImage ? "file://" + (root.entry.path || "") : ""
+        // Qt.resolvedUrl percent-encodes as needed; string concatenation
+        // left "#" truncating the path at a bogus URL fragment and left "%"
+        // ambiguous with percent-encoding, both plausible in a downloaded
+        // filename (e.g. "screenshot #3.png").
+        source: root.isImage && root.entry.path ? Qt.resolvedUrl(root.entry.path) : ""
         sourceSize.width: 60
         sourceSize.height: 60
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
-        cache: false
+        // Thumbnails are re-requested on every resync (every 2s while a
+        // download is in flight) because `entries` is reassigned wholesale;
+        // caching avoids re-decoding images that haven't changed on disk.
+        cache: true
       }
 
       Text {
         anchors.centerIn: parent
-        visible: !root.isImage || parent.children[0].status !== Image.Ready
+        visible: !root.isImage || thumbImage.status !== Image.Ready
         text: root.entry.partial === true ? "󰇚" : "󰈔"
         color: root.entry.partial === true ? root.accent : root.dim
         font.family: root.fontFamily
@@ -79,7 +90,10 @@ Item {
     }
 
     Column {
-      width: parent.width - Style.space(40)
+      // Room left after the thumbnail/glyph and the one gap Row's spacing
+      // puts between its two children, rather than a magic number that
+      // silently re-encodes those two values.
+      width: parent.width - contentRow.thumbSize - contentRow.spacing
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(2)
 
@@ -114,8 +128,6 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     spacing: Style.space(2)
 
-    // In-progress downloads get a spinner here instead of quick actions —
-    // there's nothing to open/copy/trash yet.
     Text {
       visible: root.entry.partial === true
       anchors.verticalCenter: parent.verticalCenter

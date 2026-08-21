@@ -4,20 +4,30 @@
 # fall back to plain xdg-open of the folder when no file manager exposes it.
 set -euo pipefail
 
+# shellcheck source=lib.sh
+source "$(cd "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
 target="${1:?usage: downloads-reveal <file-or-folder>}"
 [[ -e "$target" ]] || { echo "downloads-reveal: no such path: $target" >&2; exit 1; }
 
-abs="$(cd "$(dirname -- "$target")" && pwd)/$(basename -- "$target")"
+abs="$(abs_path "$target")"
 
 if [[ -d "$abs" ]]; then
   exec xdg-open "$abs"
 fi
 
+# The path is percent-encoded before it goes anywhere near the GVariant array
+# literal below: an unencoded path can contain a literal "'" (closing the
+# array element early) as well as characters like "#" or "%" that are not
+# valid in a bare file:// URI. Encoding first means the string handed to
+# gdbus never contains a quote, and the URI itself is well-formed.
+uri="file://$(uri_encode_path "$abs")"
+
 if gdbus call --session \
   --dest org.freedesktop.FileManager1 \
   --object-path /org/freedesktop/FileManager1 \
   --method org.freedesktop.FileManager1.ShowItems \
-  "['file://$abs']" "" >/dev/null 2>&1; then
+  "['$uri']" "" >/dev/null 2>&1; then
   exit 0
 fi
 

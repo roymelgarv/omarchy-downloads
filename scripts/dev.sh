@@ -14,7 +14,9 @@ deploy() {
   rsync -a --delete --exclude '.git' --exclude 'node_modules' "$SRC/" "$DEST/"
   touch "$STAMP"
   omarchy plugin validate "$DEST"
-  omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
+  if ! omarchy-shell shell rescanPlugins >/dev/null 2>&1; then
+    echo "warning: rescanPlugins failed — is omarchy-shell running? Deployed files may not be live yet." >&2
+  fi
   echo "Deployed to $DEST"
 }
 
