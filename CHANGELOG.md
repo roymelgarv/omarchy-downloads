@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Success toast banner ("Moved … to trash" / "Copied … to clipboard") shown after a quick action completes, auto-dismissing after ~2.5s.
+
 ### Changed
 - File names no longer repeat the extension; each row now shows the size and type together below the name (e.g. "130.8 KB · .PNG").
 

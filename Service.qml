@@ -165,12 +165,25 @@ Item {
   }
 
   function copyFile(path) {
-    actionProcess.command = ["bash", pluginDir + "/bin/downloads-copy", path]
-    actionProcess.running = true
+    runAction("copy", path)
   }
 
   function trashFile(path) {
-    actionProcess.command = ["bash", pluginDir + "/bin/downloads-trash", path]
+    runAction("trash", path)
+  }
+
+  // Fired after copy/trash finishes, success or not, so the widget can show
+  // a confirmation toast. `name` is derived from the path (not `entries`,
+  // which may already have been rebuilt by the time the process exits).
+  signal actionCompleted(string action, string name, bool success)
+
+  property string _pendingAction: ""
+  property string _pendingName: ""
+
+  function runAction(action, path) {
+    _pendingAction = action
+    _pendingName = String(path).split("/").pop()
+    actionProcess.command = ["bash", pluginDir + "/bin/downloads-" + action, path]
     actionProcess.running = true
   }
 
@@ -184,7 +197,9 @@ Item {
       onStreamFinished: root.lastError = String(text).trim()
     }
     onExited: function (exitCode) {
-      if (exitCode === 0) root.lastError = ""
+      var success = exitCode === 0
+      if (success) root.lastError = ""
+      root.actionCompleted(root._pendingAction, root._pendingName, success)
       root.scheduleResync()
     }
   }

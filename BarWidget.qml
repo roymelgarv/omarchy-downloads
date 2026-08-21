@@ -31,6 +31,27 @@ Panel {
   property int cursor: 0
   property var pendingTrash: null
 
+  // Success toast for a completed quick action (trash/copy), auto-dismissed.
+  property string toastMessage: ""
+
+  Timer {
+    id: toastTimer
+    interval: 2500
+    repeat: false
+    onTriggered: root.toastMessage = ""
+  }
+
+  Connections {
+    target: root.service
+    function onActionCompleted(action, name, success) {
+      if (!success) return
+      var text = Model.actionToastMessage(action, name)
+      if (text === "") return
+      root.toastMessage = text
+      toastTimer.restart()
+    }
+  }
+
   readonly property var visibleEntries: {
     if (!service) return []
     var filtered = Model.filterEntries(query, service.entries)
@@ -65,6 +86,8 @@ Panel {
       query = ""
       cursor = 0
       pendingTrash = null
+      toastTimer.stop()
+      toastMessage = ""
       Qt.callLater(function () { searchField.forceActiveFocus() })
     }
   }
@@ -230,6 +253,17 @@ Panel {
           width: parent.width
           spacing: Style.space(2)
 
+          Text {
+            visible: root.query.trim() === "" && root.visibleEntries.length > 0
+            width: parent.width
+            bottomPadding: Style.space(4)
+            text: "Last " + root.recentCount + (root.recentCount === 1 ? " file" : " files")
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            font.bold: true
+          }
+
           Repeater {
             model: root.visibleEntries
             FileRow {
@@ -263,6 +297,40 @@ Panel {
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
             horizontalAlignment: Text.AlignHCenter
+          }
+        }
+
+        // --------------------------------------------------------- toast
+        Rectangle {
+          id: toastBanner
+          readonly property int horizontalPadding: Style.space(12)
+          width: parent.width
+          height: root.toastMessage !== "" ? implicitHeight : 0
+          implicitHeight: toastText.implicitHeight + Style.space(16)
+          clip: true
+          radius: Style.space(6)
+          color: Util.alpha(Color.accent, 0.15)
+          border.color: Color.accent
+          border.width: 1
+          visible: height > 0
+
+          Behavior on height {
+            NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+          }
+
+          Text {
+            id: toastText
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: toastBanner.horizontalPadding
+            anchors.rightMargin: toastBanner.horizontalPadding
+            text: "✓ " + root.toastMessage
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignLeft
           }
         }
       }
