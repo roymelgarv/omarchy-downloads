@@ -28,7 +28,7 @@ function extOf(name) {
 function baseName(name) {
   var s = String(name);
   var at = s.lastIndexOf(".");
-  if (at <= 0) return s; // no dot, or dotfile like ".bashrc"
+  if (at <= 0) return s;
   return s.slice(0, at);
 }
 
@@ -107,7 +107,10 @@ function withoutDownloadPlaceholders(entries) {
 }
 
 function completedSince(prevNames, currentNames) {
-  var prev = {};
+  // Object.create(null), not {}: a plain object inherits Object.prototype, so
+  // a download named "constructor" or "toString" would read back as truthy
+  // and never badge, and `prev["__proto__"] = true` would not even store.
+  var prev = Object.create(null);
   for (var i = 0; i < prevNames.length; i++) prev[prevNames[i]] = true;
   var out = [];
   for (var j = 0; j < currentNames.length; j++) {
@@ -118,8 +121,41 @@ function completedSince(prevNames, currentNames) {
   return out;
 }
 
-// Full name is kept, not elided — the toast banner wraps instead of hiding
-// part of the name.
+// The panel's model: what the file list shows for a given query. `entries`
+// must already be mtime-desc — Service.resync() guarantees that, and re-sorting
+// here would repeat that work on every folder event, once per monitor.
+// recentCount caps the idle list only; a search returns every match.
+function visibleEntries(query, entries, recentCount) {
+  var safe = withoutDownloadPlaceholders(entries || []);
+  if (String(query || "").trim() === "") return safe.slice(0, Math.max(0, Number(recentCount) || 0));
+  return filterEntries(query, safe);
+}
+
+// Whether two entry lists describe the same folder state. Used to leave
+// `entries` untouched when a watcher event changed nothing: reassigning it
+// resets every bound ListView (losing scroll position) and re-requests every
+// thumbnail, so identity is worth preserving.
+function entriesEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].name !== b[i].name || a[i].size !== b[i].size ||
+        a[i].mtime !== b[i].mtime || a[i].partial !== b[i].partial) return false;
+  }
+  return true;
+}
+
+// Whether the folder still holds exactly the same file names in the same
+// order. A download in flight changes sizes but not names, which is what lets
+// the caller skip the recursive folder-totals scan until a file actually
+// appears, disappears, or is renamed.
+function namesEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+// Returns the full name, unelided; callers are expected to wrap rather than
+// truncate.
 function actionToastMessage(action, name) {
   var label = String(name || "");
   if (action === "trash") return "Moved \"" + label + "\" to trash";
@@ -150,6 +186,9 @@ if (typeof module !== "undefined" && module.exports) {
     searchScore: searchScore,
     filterEntries: filterEntries,
     withoutDownloadPlaceholders: withoutDownloadPlaceholders,
+    visibleEntries: visibleEntries,
+    entriesEqual: entriesEqual,
+    namesEqual: namesEqual,
     completedSince: completedSince,
     elideMiddle: elideMiddle,
     actionToastMessage: actionToastMessage
