@@ -179,51 +179,59 @@ Panel {
         width: parent.width
         spacing: Style.space(12)
 
-        // ---------------------------------------------------------- hero
-        PanelHero {
+        // ------------------------------------------------- hero + status
+        // Grouped in their own tightly-spaced Column so the status line
+        // reads as directly attached to the title, not floating below it
+        // at the outer Column's wider spacing.
+        Column {
           width: parent.width
-          title: "Downloads"
-          // Built manually below instead: PanelHero always uppercases meta,
-          // but the status line needs normal sentence case.
-          meta: ""
-          foreground: root.foreground
-          fontFamily: root.fontFamily
+          spacing: Style.space(2)
 
-          iconComponent: Component {
-            Text {
-              text: "󰇚"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.display
+          PanelHero {
+            width: parent.width
+            title: "Downloads"
+            // Built manually below instead: PanelHero always uppercases
+            // meta, but the status line needs normal sentence case.
+            meta: ""
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+
+            iconComponent: Component {
+              Text {
+                text: "󰇚"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.display
+              }
             }
-          }
 
-          trailingControl: Component {
-            Button {
-              text: "Open"
-              tooltipText: "Open the folder in the file manager"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              bordered: true
-              onClicked: {
-                if (root.service) root.service.openFolder()
-                root.close()
+            trailingControl: Component {
+              Button {
+                text: "Open"
+                tooltipText: "Open the folder in the file manager"
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                bordered: true
+                onClicked: {
+                  if (root.service) root.service.openFolder()
+                  root.close()
+                }
               }
             }
           }
-        }
 
-        // Status, right under the title (indented to match it).
-        Text {
-          visible: !!root.service
-          width: parent.width
-          leftPadding: Style.space(23)
-          text: root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads"
-          color: root.service && root.service.downloadingCount > 0 ? Color.accent : root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          font.bold: true
-          elide: Text.ElideRight
+          // Status, right under the title (indented to match it).
+          Text {
+            visible: !!root.service
+            width: parent.width
+            leftPadding: Style.space(23)
+            text: root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads"
+            color: root.service && root.service.downloadingCount > 0 ? Color.accent : root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+            elide: Text.ElideRight
+          }
         }
 
         // Size/count, flush against the panel's left edge (no indent).
