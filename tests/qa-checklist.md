@@ -33,12 +33,16 @@ this — these are the interactions only a human can judge.
 
 ## Search & keyboard
 - [ ] Panel opens with the search field focused; typing filters the whole folder, not just recents
-- [ ] Up/Down move the selection; Enter opens the selected file; Delete key trashes (with dialog)
+- [ ] Up/Down move the selection; Enter opens the selected file
+- [ ] With the search box empty, Delete trashes the selected file (with dialog)
+- [ ] With a query typed, Delete edits the text (forward-delete) and does NOT trash — check this with "Confirm before trashing" off too
+- [ ] Shift+Delete trashes the selected file even mid-search
 - [ ] Esc clears the query first, then closes the panel
 - [ ] No matches shows the "No matches" empty state; empty folder shows "No downloads yet"
 
 ## Settings & environment
 - [ ] Changing "Folder to watch" points the widget at the new folder
+- [ ] Point it at a folder inside a hidden directory (e.g. `~/.local/share/testdl`) and at a hidden folder itself (`~/.testdl`): the header total matches the listed files instead of reading "0 B · 0 files"
 - [ ] Changing "Recent files shown" resizes the list
 - [ ] Theme switch (`omarchy theme set …`) recolors the panel correctly
 - [ ] Works with the bar at top and bottom, and on multiple monitors
