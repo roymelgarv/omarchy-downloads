@@ -9,12 +9,14 @@
 # which is wrong for anything outside Latin-1.
 uri_encode_path() {
   local LC_ALL=C
-  local s="$1" out="" c i
+  local s="$1" out="" c hex i
   for ((i = 0; i < ${#s}; i++)); do
     c="${s:i:1}"
     case "$c" in
       [A-Za-z0-9._~/-]) out+="$c" ;;
-      *) out+="$(printf '%%%02X' "'$c")" ;;
+      # printf -v, not "$(printf ...)": command substitution forks a subshell
+      # per encoded byte, which is the whole cost of this function.
+      *) printf -v hex '%%%02X' "'$c"; out+="$hex" ;;
     esac
   done
   printf '%s' "$out"
