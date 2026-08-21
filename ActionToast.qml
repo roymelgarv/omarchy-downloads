@@ -5,7 +5,12 @@ import qs.Ui
 // Transient confirmation banner shown under the file list after a copy or
 // trash completes. Collapses to zero height when empty so the card shrinks
 // back rather than leaving a gap.
-Item {
+//
+// No bottom margin of its own: as the Column's last child it sits directly on
+// the card's own popupPadding, which is what gives every other element its
+// inset. Adding a margin here would inset the toast further from the card edge
+// than the list is from the sides.
+Rectangle {
   id: root
 
   property color foreground: Color.foreground
@@ -16,7 +21,7 @@ Item {
   property string _message: ""
 
   readonly property int horizontalPadding: Style.space(12)
-  readonly property int bottomMargin: Style.space(10)
+  readonly property int verticalPadding: Style.space(8)
 
   function show(text) {
     if (!text) return
@@ -29,8 +34,16 @@ Item {
     _message = ""
   }
 
-  height: _message !== "" ? (box.implicitHeight + root.bottomMargin) : 0
+  // Driven by the text's own height rather than a fixed row height so a
+  // wrapped two-line message still gets even padding above and below.
+  implicitHeight: label.implicitHeight
+  height: _message !== "" ? implicitHeight : 0
   visible: height > 0
+  clip: true
+  radius: Style.space(6)
+  color: Util.alpha(Color.accent, 0.15)
+  border.color: Color.accent
+  border.width: 1
 
   Behavior on height {
     NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
@@ -43,33 +56,23 @@ Item {
     onTriggered: root._message = ""
   }
 
-  Rectangle {
-    id: box
+  // Anchored to the top, not vertically centred: while the collapse animation
+  // runs the banner's height is between 0 and implicitHeight, and centring
+  // would slide the text through the shrinking box instead of clipping it.
+  Text {
+    id: label
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: parent.top
-    implicitHeight: label.implicitHeight
-    clip: true
-    radius: Style.space(6)
-    color: Util.alpha(Color.accent, 0.15)
-    border.color: Color.accent
-    border.width: 1
-
-    Text {
-      id: label
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      anchors.leftMargin: root.horizontalPadding
-      anchors.rightMargin: root.horizontalPadding
-      topPadding: Style.space(8)
-      bottomPadding: Style.space(8)
-      text: "✓ " + root._message
-      color: root.foreground
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.bodySmall
-      wrapMode: Text.WordWrap
-      horizontalAlignment: Text.AlignLeft
-    }
+    anchors.leftMargin: root.horizontalPadding
+    anchors.rightMargin: root.horizontalPadding
+    topPadding: root.verticalPadding
+    bottomPadding: root.verticalPadding
+    text: "✓ " + root._message
+    color: root.foreground
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.bodySmall
+    wrapMode: Text.WordWrap
+    horizontalAlignment: Text.AlignLeft
   }
 }
