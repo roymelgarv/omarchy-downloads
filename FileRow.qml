@@ -114,6 +114,25 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     spacing: Style.space(2)
 
+    // In-progress downloads get a spinner here instead of quick actions —
+    // there's nothing to open/copy/trash yet.
+    Text {
+      visible: root.entry.partial === true
+      anchors.verticalCenter: parent.verticalCenter
+      text: "󰦖"
+      color: root.accent
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.icon
+
+      RotationAnimator on rotation {
+        running: root.entry.partial === true
+        from: 0
+        to: 360
+        duration: 800
+        loops: Animation.Infinite
+      }
+    }
+
     PanelActionButton {
       visible: root.hot && root.actionable
       anchors.verticalCenter: parent.verticalCenter
