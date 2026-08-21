@@ -253,6 +253,17 @@ Panel {
           width: parent.width
           spacing: Style.space(2)
 
+          Text {
+            visible: root.query.trim() === "" && root.visibleEntries.length > 0
+            width: parent.width
+            bottomPadding: Style.space(4)
+            text: "Last " + root.recentCount + (root.recentCount === 1 ? " file" : " files")
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            font.bold: true
+          }
+
           Repeater {
             model: root.visibleEntries
             FileRow {
