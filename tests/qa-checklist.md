@@ -13,7 +13,8 @@ this — these are the interactions only a human can judge.
 
 ## Live tracking
 - [ ] Download a real file in a browser: a downloading row appears (accent color, size ticking)
-- [ ] When it finishes, the row becomes a normal file at the top of the list
+- [ ] The bar icon pulses (fades in/out on a loop) while the download is in progress
+- [ ] When it finishes, the row becomes a normal file at the top of the list, and the icon stops pulsing and returns to full opacity
 - [ ] With the panel closed, finishing a download shows the badge dot on the bar icon
 - [ ] Opening the panel clears the badge
 
@@ -24,8 +25,8 @@ this — these are the interactions only a human can judge.
 - [ ] Trash icon shows the confirmation dialog; Confirm moves the file to trash; Cancel keeps it
 - [ ] With "Confirm before trashing" off, trash acts immediately
 - [ ] Trashed file is recoverable from the system trash
-- [ ] Trashing a file shows a "Moved … to trash" toast banner above the header, which auto-dismisses after ~2.5s
-- [ ] Copying a file shows a "Copied … to clipboard" toast banner, which also auto-dismisses
+- [ ] Trashing a file shows a "Moved … to trash" toast banner at the bottom of the panel, which auto-dismisses after ~2.5s
+- [ ] Copying a file shows a "Copied … to clipboard" toast banner in the same spot, which also auto-dismisses
 - [ ] Closing and reopening the panel clears any toast still showing
 
 ## Search & keyboard
