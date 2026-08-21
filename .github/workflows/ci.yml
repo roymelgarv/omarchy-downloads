@@ -28,7 +28,6 @@ jobs:
             (.kinds | length > 0) and
             (.entryPoints | length > 0)
           ' manifest.json
-          # every entry point must exist and be a relative path
           for f in $(jq -r '.entryPoints[]' manifest.json); do
             case "$f" in
               /*|*..*) echo "invalid entry point path: $f"; exit 1 ;;
@@ -45,7 +44,24 @@ jobs:
       - name: ShellCheck
         run: shellcheck bin/* scripts/*.sh
 
-      - name: Bats tests (bin scripts)
+      - name: Install bats (pinned)
         run: |
-          sudo apt-get update -q && sudo apt-get install -qy bats
-          bats tests/bin.bats
+          git clone --depth 1 --branch v1.11.0 https://github.com/bats-core/bats-core.git /tmp/bats-core
+          sudo /tmp/bats-core/install.sh /usr/local
+
+      - name: Bats tests (bin scripts)
+        run: bats tests/bin.bats
+
+      - name: QML syntax check (non-blocking)
+        # Best-effort only: qmllint can't resolve the Quickshell/qs.Ui/
+        # qs.Commons modules these files import (they only exist inside a
+        # running omarchy-shell, not on a bare CI runner), so this can't be a
+        # hard gate without vendoring those modules. It still catches plain
+        # QML syntax errors, which is worth having even non-blocking.
+        run: |
+          sudo apt-get update -q && sudo apt-get install -qy qt6-declarative-dev
+          QMLLINT="$(command -v qmllint6 || command -v qmllint || find /usr/lib/qt6 -name qmllint 2>/dev/null | head -1)"
+          if [ -z "$QMLLINT" ]; then
+            echo "qmllint not found, skipping"; exit 0
+          fi
+          "$QMLLINT" BarWidget.qml FileRow.qml Service.qml || true

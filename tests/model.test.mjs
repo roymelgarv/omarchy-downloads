@@ -5,8 +5,6 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const Model = require("../Model.js");
 
-// ---------------------------------------------------------------- humanSize
-
 test("humanSize formats bytes below 1 KB as B", () => {
   assert.equal(Model.humanSize(0), "0 B");
   assert.equal(Model.humanSize(512), "512 B");
@@ -25,8 +23,6 @@ test("humanSize handles invalid input as 0 B", () => {
   assert.equal(Model.humanSize(undefined), "0 B");
 });
 
-// ---------------------------------------------------------------- extOf
-
 test("extOf returns lowercase extension without the dot", () => {
   assert.equal(Model.extOf("photo.JPEG"), "jpeg");
   assert.equal(Model.extOf("archive.tar.gz"), "gz");
@@ -37,7 +33,12 @@ test("extOf returns empty string for files without extension or dotfiles", () =>
   assert.equal(Model.extOf(".bashrc"), "");
 });
 
-// -------------------------------------------------------------- baseName
+test("isImageExt recognizes known image extensions case-insensitively", () => {
+  assert.equal(Model.isImageExt("png"), true);
+  assert.equal(Model.isImageExt("JPEG"), true);
+  assert.equal(Model.isImageExt("pdf"), false);
+  assert.equal(Model.isImageExt(""), false);
+});
 
 test("baseName strips the extension shown separately as the file's type", () => {
   assert.equal(Model.baseName("report.pdf"), "report");
@@ -48,8 +49,6 @@ test("baseName leaves files without an extension or dotfiles untouched", () => {
   assert.equal(Model.baseName("Makefile"), "Makefile");
   assert.equal(Model.baseName(".bashrc"), ".bashrc");
 });
-
-// ------------------------------------------------------- partial downloads
 
 test("isPartialDownload detects browser partial-download suffixes", () => {
   assert.equal(Model.isPartialDownload("movie.mkv.part"), true);
@@ -64,8 +63,6 @@ test("finalNameOf strips the partial suffix", () => {
   assert.equal(Model.finalNameOf("setup.exe.crdownload"), "setup.exe");
   assert.equal(Model.finalNameOf("doc.pdf"), "doc.pdf");
 });
-
-// ---------------------------------------------------------------- sorting
 
 test("sortByMtimeDesc orders newest first without mutating input", () => {
   const entries = [
@@ -85,8 +82,6 @@ test("sortByMtimeDesc breaks mtime ties by name for stable display", () => {
   ]);
   assert.deepEqual(sorted.map(e => e.name), ["a.txt", "b.txt"]);
 });
-
-// ---------------------------------------------------------------- search
 
 test("filterEntries returns newest-first entries when query is empty", () => {
   const entries = [
@@ -137,8 +132,6 @@ test("filterEntries returns empty array when nothing matches", () => {
   assert.deepEqual(Model.filterEntries("zzz", [{ name: "a.txt", mtime: 1 }]), []);
 });
 
-// ------------------------------------------------ download placeholders
-
 test("withoutDownloadPlaceholders hides zero-byte files while something is downloading", () => {
   const entries = [
     { path: "/a", name: "a.crdownload", size: 1024, partial: true },
@@ -158,8 +151,6 @@ test("withoutDownloadPlaceholders never hides the partial entry itself, even at 
   const entries = [{ path: "/a", name: "a.crdownload", size: 0, partial: true }];
   assert.deepEqual(Model.withoutDownloadPlaceholders(entries), entries);
 });
-
-// ------------------------------------------------------------ badge logic
 
 test("completedSince reports files that appeared since the previous scan", () => {
   const prev = ["a.pdf"];
@@ -183,8 +174,6 @@ test("completedSince reports nothing when files are only removed", () => {
   assert.deepEqual(Model.completedSince(["a.pdf", "b.iso"], ["a.pdf"]), []);
 });
 
-// ------------------------------------------------------------ elideMiddle
-
 test("elideMiddle leaves short names untouched", () => {
   assert.equal(Model.elideMiddle("short.txt", 20), "short.txt");
 });
@@ -197,7 +186,10 @@ test("elideMiddle shortens long names in the middle, keeping the extension", () 
   assert.ok(out.startsWith("a-very"));
 });
 
-// ------------------------------------------------------ actionToastMessage
+test("elideMiddle truncates without an ellipsis when max leaves no room for one", () => {
+  assert.equal(Model.elideMiddle("verylongname.txt", 3), "ver");
+  assert.equal(Model.elideMiddle("verylongname.txt", 0), "");
+});
 
 test("actionToastMessage formats a trash success message", () => {
   assert.equal(Model.actionToastMessage("trash", "report.pdf"), 'Moved "report.pdf" to trash');

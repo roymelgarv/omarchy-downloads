@@ -24,14 +24,19 @@ Panel {
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
-  readonly property int recentCount: setting("recentCount", 5)
+  // Clamped to the manifest schema's declared min/max: the shell hands back
+  // whatever value is stored without re-validating it against the schema.
+  readonly property int recentCount: {
+    var n = Number(setting("recentCount", 5))
+    if (!isFinite(n)) n = 5
+    return Math.max(3, Math.min(15, Math.round(n)))
+  }
   readonly property bool confirmTrash: setting("confirmTrash", true)
 
   property string query: ""
   property int cursor: 0
   property var pendingTrash: null
 
-  // Success toast for a completed quick action (trash/copy), auto-dismissed.
   property string toastMessage: ""
 
   Timer {
@@ -81,8 +86,9 @@ Panel {
   onSettingsChanged: pushSettings()
   Component.onDestruction: if (service) service.unregisterPanel(root)
 
+  // service.anyPanelOpen is derived from the registered panels' own `opened`
+  // state (see Service.qml) — this handler no longer needs to push it.
   onOpenedChanged: {
-    if (service) service.anyPanelOpen = opened
     if (opened) {
       query = ""
       cursor = 0
@@ -108,7 +114,6 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  // --------------------------------------------------------------- bar icon
   BarIconButton {
     id: button
     anchors.fill: parent
@@ -123,8 +128,6 @@ Panel {
           font.family: root.fontFamily
           font.pixelSize: Style.font.icon
 
-          // Pulse while anything is downloading, so an active transfer is
-          // noticeable without opening the panel.
           SequentialAnimation {
             id: pulseAnim
             running: !!root.service && root.service.downloadingCount > 0
@@ -156,7 +159,6 @@ Panel {
     }
   }
 
-  // ---------------------------------------------------------------- popout
   KeyboardPanel {
     id: panel
     anchorItem: button
@@ -179,7 +181,6 @@ Panel {
         width: parent.width
         spacing: Style.space(12)
 
-        // ---------------------------------------------------------- hero
         // Built manually rather than via PanelHero: its icon only centers
         // against its own title+meta pairing, and meta always renders
         // uppercase — neither works once the status line needs sentence
@@ -246,7 +247,6 @@ Panel {
           }
         }
 
-        // Size/count, flush against the panel's left edge (no indent).
         Text {
           visible: !!root.service
           width: parent.width
@@ -263,7 +263,6 @@ Panel {
 
         PanelSeparator { foreground: root.foreground }
 
-        // -------------------------------------------------------- search
         TextField {
           id: searchField
           width: parent.width
@@ -308,7 +307,6 @@ Panel {
           wrapMode: Text.WordWrap
         }
 
-        // ---------------------------------------------------------- list
         Column {
           width: parent.width
           spacing: Style.space(2)
@@ -345,6 +343,7 @@ Panel {
               entry: modelData
               selected: index === root.cursor
               foreground: root.foreground
+              dim: root.dim
               accent: Color.accent
               fontFamily: root.fontFamily
               onHoveredRow: root.cursor = index
@@ -372,7 +371,6 @@ Panel {
           }
         }
 
-        // --------------------------------------------------------- toast
         Rectangle {
           id: toastBanner
           readonly property int horizontalPadding: Style.space(12)
@@ -407,7 +405,6 @@ Panel {
         }
       }
 
-      // ------------------------------------------------- trash confirm
       ConfirmDialog {
         id: confirmDialog
         anchors.fill: parent

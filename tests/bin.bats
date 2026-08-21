@@ -23,7 +23,19 @@ teardown() {
   count="$(echo "$output" | jq .count)"
   bytes="$(echo "$output" | jq .bytes)"
   [ "$count" -eq 3 ]
-  [ "$bytes" -ge 14 ]   # du block-size accounting may round up, never down
+  [ "$bytes" -eq 14 ]
+}
+
+@test "downloads-stats excludes dotfiles and dot-directories, matching the panel's file list" {
+  printf 'aaaa' > "$FIXTURE/a.txt"          # 4 bytes, counted
+  printf 'hidden' > "$FIXTURE/.secret"      # not counted
+  mkdir "$FIXTURE/.cache"
+  printf 'nope' > "$FIXTURE/.cache/x.txt"   # not counted
+
+  run "$BIN/downloads-stats" "$FIXTURE"
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq .count)" -eq 1 ]
+  [ "$(echo "$output" | jq .bytes)" -eq 4 ]
 }
 
 @test "downloads-stats handles an empty folder" {
@@ -42,6 +54,13 @@ teardown() {
   run "$BIN/downloads-copy" --print-uri "$FIXTURE/my file (1).pdf"
   [ "$status" -eq 0 ]
   [[ "$output" == "file://$FIXTURE/my%20file%20%281%29.pdf" ]]
+}
+
+@test "downloads-copy percent-encodes non-ASCII bytes (UTF-8), not code points" {
+  touch "$FIXTURE/café 中.pdf"
+  run "$BIN/downloads-copy" --print-uri "$FIXTURE/café 中.pdf"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "file://$FIXTURE/caf%C3%A9%20%E4%B8%AD.pdf" ]]
 }
 
 @test "downloads-copy fails on a missing file" {
