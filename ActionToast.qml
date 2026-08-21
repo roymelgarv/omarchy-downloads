@@ -56,7 +56,7 @@ Rectangle {
     anchors.leftMargin: root.horizontalPadding
     anchors.rightMargin: root.horizontalPadding
     topPadding: Style.space(8)
-    bottomPadding: Style.space(12)
+    bottomPadding: Style.space(18)
     text: "✓ " + root._message
     color: root.foreground
     font.family: root.fontFamily
