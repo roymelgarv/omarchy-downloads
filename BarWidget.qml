@@ -227,6 +227,7 @@ Panel {
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
               font.bold: true
+              font.letterSpacing: 1.2
               elide: Text.ElideRight
             }
           }
