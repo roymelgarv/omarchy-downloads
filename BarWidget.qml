@@ -319,7 +319,7 @@ Panel {
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
             wrapMode: Text.WordWrap
-            horizontalAlignment: Text.AlignHCenter
+            horizontalAlignment: Text.AlignLeft
           }
         }
       }
