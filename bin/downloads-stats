@@ -8,13 +8,24 @@
 # (rather than a separate `du` and `find`) also halves the directory
 # traversals this does, which matters because it runs on a timer while a
 # download is in progress.
+#
+# `-name '.*' -prune` matches each entry's own name, so only entries hidden
+# *below* the watched folder are skipped. A `-path '*/.*'` test would match
+# against the whole path instead and exclude everything under a folder that
+# is itself inside a dot-directory (~/.local/share/downloads, a Syncthing
+# tree), reporting zero over a list the panel still shows. Pruning also stops
+# find from descending into hidden directories at all.
+#
+# `-mindepth 1` keeps the watched folder itself out of that name test —
+# without it, pointing the plugin at a hidden folder (~/.downloads) prunes
+# the search at its own root and reports zero.
 set -euo pipefail
 
 dir="${1:?usage: downloads-stats <folder>}"
 [[ -d "$dir" ]] || { echo "downloads-stats: no such folder: $dir" >&2; exit 1; }
 
 read -r bytes count < <(
-  find "$dir" -type f -not -path '*/.*' -printf '%s\n' |
+  find "$dir" -mindepth 1 -name '.*' -prune -o -type f -printf '%s\n' |
     awk '{ sum += $1; n++ } END { printf "%d %d\n", sum, n }'
 )
 

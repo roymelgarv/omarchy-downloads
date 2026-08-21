@@ -38,6 +38,39 @@ teardown() {
   [ "$(echo "$output" | jq .bytes)" -eq 4 ]
 }
 
+# The exclusion must apply to the part of the path below the watched folder,
+# not the whole path: a folder that itself lives under a dot-directory (a
+# Syncthing/Nextcloud tree, ~/.local/share/downloads) is a legal setting for
+# the `folder` option, and every file under it used to be excluded — the hero
+# read "0 B · 0 files" over a list the panel was still showing.
+@test "downloads-stats counts files when the watched folder is inside a dot-directory" {
+  deep="$FIXTURE/.local/share/Downloads"
+  mkdir -p "$deep"
+  printf 'aaaa' > "$deep/a.txt"             # 4 bytes, counted
+  printf 'bbbb' > "$deep/b.txt"             # 4 bytes, counted
+  printf 'hidden' > "$deep/.secret"         # still not counted
+  mkdir "$deep/.cache"
+  printf 'nope' > "$deep/.cache/x.txt"      # still not counted
+
+  run "$BIN/downloads-stats" "$deep"
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq .count)" -eq 2 ]
+  [ "$(echo "$output" | jq .bytes)" -eq 8 ]
+}
+
+@test "downloads-stats counts files when the watched folder is itself hidden" {
+  deep="$FIXTURE/.downloads"
+  mkdir -p "$deep/.cache"
+  printf 'aaaa' > "$deep/a.txt"             # 4 bytes, counted
+  printf 'hidden' > "$deep/.secret"         # not counted
+  printf 'nope' > "$deep/.cache/x.txt"      # not counted
+
+  run "$BIN/downloads-stats" "$deep"
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq .count)" -eq 1 ]
+  [ "$(echo "$output" | jq .bytes)" -eq 4 ]
+}
+
 @test "downloads-stats handles an empty folder" {
   run "$BIN/downloads-stats" "$FIXTURE"
   [ "$status" -eq 0 ]

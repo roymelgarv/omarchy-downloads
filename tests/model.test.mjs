@@ -174,6 +174,112 @@ test("completedSince reports nothing when files are only removed", () => {
   assert.deepEqual(Model.completedSince(["a.pdf", "b.iso"], ["a.pdf"]), []);
 });
 
+// A plain {} inherits Object.prototype, so a file named after one of its
+// members ("constructor", "toString", …) reads back as already-seen and never
+// badges. The seen-set must have no prototype.
+test("completedSince badges files named after Object.prototype members", () => {
+  const out = Model.completedSince(["a.pdf"], ["constructor", "toString", "__proto__", "valueOf"]);
+  assert.deepEqual(out, ["constructor", "toString", "__proto__", "valueOf"]);
+});
+
+test("completedSince still suppresses a prototype-named file seen in the previous scan", () => {
+  assert.deepEqual(Model.completedSince(["constructor"], ["constructor"]), []);
+});
+
+test("withoutDownloadPlaceholders preserves input order", () => {
+  const entries = [
+    { path: "/a", name: "a.part", size: 10, partial: true },
+    { path: "/b", name: "b.txt", size: 30, partial: false },
+    { path: "/c", name: "c.txt", size: 20, partial: false }
+  ];
+  assert.deepEqual(Model.withoutDownloadPlaceholders(entries).map(e => e.path), ["/a", "/b", "/c"]);
+});
+
+test("visibleEntries takes the newest recentCount entries when the query is empty", () => {
+  const entries = [
+    { name: "new.txt", mtime: 300, size: 1, partial: false },
+    { name: "mid.txt", mtime: 200, size: 1, partial: false },
+    { name: "old.txt", mtime: 100, size: 1, partial: false }
+  ];
+  const out = Model.visibleEntries("", entries, 2);
+  assert.deepEqual(out.map(e => e.name), ["new.txt", "mid.txt"]);
+});
+
+test("visibleEntries treats a whitespace-only query as empty", () => {
+  const entries = [{ name: "a.txt", mtime: 1, size: 1, partial: false }];
+  assert.deepEqual(Model.visibleEntries("   ", entries, 5).map(e => e.name), ["a.txt"]);
+});
+
+test("visibleEntries ignores recentCount while searching, returning every match", () => {
+  const entries = [
+    { name: "report-1.pdf", mtime: 3, size: 1, partial: false },
+    { name: "report-2.pdf", mtime: 2, size: 1, partial: false },
+    { name: "report-3.pdf", mtime: 1, size: 1, partial: false }
+  ];
+  const out = Model.visibleEntries("report", entries, 1);
+  assert.equal(out.length, 3);
+});
+
+test("visibleEntries hides zero-byte placeholders while a download is in flight", () => {
+  const entries = [
+    { name: "movie.mkv.part", mtime: 3, size: 900, partial: true },
+    { name: "movie.mkv", mtime: 2, size: 0, partial: false },
+    { name: "notes.txt", mtime: 1, size: 40, partial: false }
+  ];
+  const out = Model.visibleEntries("", entries, 10);
+  assert.deepEqual(out.map(e => e.name), ["movie.mkv.part", "notes.txt"]);
+});
+
+test("visibleEntries relies on the caller's mtime-desc order rather than re-sorting", () => {
+  // Service.resync() already stores entries newest-first; re-sorting here
+  // would be redundant work on every folder event, per monitor.
+  const entries = [
+    { name: "b.txt", mtime: 100, size: 1, partial: false },
+    { name: "a.txt", mtime: 300, size: 1, partial: false }
+  ];
+  assert.deepEqual(Model.visibleEntries("", entries, 10).map(e => e.name), ["b.txt", "a.txt"]);
+});
+
+test("visibleEntries clamps a nonsensical recentCount to an empty list", () => {
+  const entries = [{ name: "a.txt", mtime: 1, size: 1, partial: false }];
+  assert.deepEqual(Model.visibleEntries("", entries, -3), []);
+});
+
+test("entriesEqual accepts lists with identical name, size, mtime and partial state", () => {
+  const a = [{ name: "a.txt", path: "/a", size: 10, mtime: 5, partial: false }];
+  const b = [{ name: "a.txt", path: "/a", size: 10, mtime: 5, partial: false }];
+  assert.equal(Model.entriesEqual(a, b), true);
+});
+
+test("entriesEqual rejects a changed size, so a growing download still republishes", () => {
+  const a = [{ name: "a.part", path: "/a", size: 10, mtime: 5, partial: true }];
+  const b = [{ name: "a.part", path: "/a", size: 20, mtime: 5, partial: true }];
+  assert.equal(Model.entriesEqual(a, b), false);
+});
+
+test("entriesEqual rejects changed length, order, mtime, or partial state", () => {
+  const base = [{ name: "a.txt", path: "/a", size: 1, mtime: 5, partial: false }];
+  assert.equal(Model.entriesEqual(base, []), false);
+  assert.equal(Model.entriesEqual(base, [base[0], base[0]]), false);
+  assert.equal(Model.entriesEqual(base, [{ name: "a.txt", path: "/a", size: 1, mtime: 6, partial: false }]), false);
+  assert.equal(Model.entriesEqual(base, [{ name: "a.txt", path: "/a", size: 1, mtime: 5, partial: true }]), false);
+  assert.equal(Model.entriesEqual(base, [{ name: "b.txt", path: "/b", size: 1, mtime: 5, partial: false }]), false);
+});
+
+test("entriesEqual handles null and undefined without throwing", () => {
+  assert.equal(Model.entriesEqual(null, []), false);
+  assert.equal(Model.entriesEqual([], null), false);
+  assert.equal(Model.entriesEqual(null, null), false);
+  assert.equal(Model.entriesEqual([], []), true);
+});
+
+test("namesEqual detects the folder gaining, losing, or renaming a file", () => {
+  assert.equal(Model.namesEqual(["a", "b"], ["a", "b"]), true);
+  assert.equal(Model.namesEqual(["a"], ["a", "b"]), false);
+  assert.equal(Model.namesEqual(["a.part"], ["a"]), false);
+  assert.equal(Model.namesEqual(null, ["a"]), false);
+});
+
 test("elideMiddle leaves short names untouched", () => {
   assert.equal(Model.elideMiddle("short.txt", 20), "short.txt");
 });

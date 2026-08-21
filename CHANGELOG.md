@@ -12,9 +12,15 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 - File names no longer repeat the extension; each row now shows the size and type together below the name (e.g. "130.8 KB · .PNG").
 - Default recent-file count raised from 5 to 7, using space the panel already had.
+- Delete now trashes the selected file only while the search box is empty, so it can act as forward-delete while typing a query; Shift+Delete trashes from anywhere.
+- The folder totals are recalculated when a file appears, vanishes, or is renamed, and otherwise at most every 10s — a download in flight no longer re-walks the whole folder every two seconds.
+- The file list is only republished when its contents actually changed, so an unrelated folder event no longer resets the list's scroll position or re-requests every thumbnail.
 
 ### Fixed
 - Search results past the eighth match were drawn outside the popout card, leaving them unreachable by mouse and keyboard. The file list now scrolls once it exceeds eight rows, and arrow-key navigation keeps the selected row in view.
+- Folder totals read "0 B · 0 files" whenever the watched folder was itself hidden (`~/.downloads`) or lived under a hidden directory (`~/.local/share/downloads`), because the hidden-file filter tested the whole path instead of each entry's own name.
+- A completed download whose name collides with a JavaScript object member (`constructor`, `toString`, …) never raised the completion badge.
+- "Confirm before trashing" is now read strictly as a boolean, so a stored string value can no longer be misread as enabled.
 
 ## [0.1.0] - 2026-08-20
 

@@ -5,9 +5,10 @@ import qs.Commons
 import qs.Ui
 import "Model.js" as Model
 
-// Bar widget + popout for Downloads. One file on purpose, matching the
-// keyboard-cleaner layout: a qs.Ui Panel root owning the bar button and the
-// KeyboardPanel popout, with all folder state read from the singleton service.
+// Bar widget + popout for Downloads, following the keyboard-cleaner layout: a
+// qs.Ui Panel root owning the bar button and the KeyboardPanel popout, with all
+// folder state read from the singleton service. The panel's own layout stays
+// here; only self-contained pieces (FileRow, ActionToast) are separate files.
 Panel {
   id: root
   moduleName: "roymelgarv.omarchy-downloads"
@@ -21,6 +22,8 @@ Panel {
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
+  // The single definition of the panel's muted tone; passed down to children
+  // rather than re-derived by each of them.
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
@@ -31,48 +34,38 @@ Panel {
     if (!isFinite(n)) n = 7
     return Math.max(3, Math.min(15, Math.round(n)))
   }
-  readonly property bool confirmTrash: setting("confirmTrash", true)
+  // `=== true` for the same reason: setting() hands back the raw stored value,
+  // and QML would coerce the string "false" to a true bool.
+  readonly property bool confirmTrash: setting("confirmTrash", true) === true
 
-  // How many rows the list shows before it starts scrolling. Eight is what
-  // fits: the card is capped at Style.space(560) and the chrome above the list
-  // (hero, totals, separator, search field, section header, Column spacings)
-  // eats ~184 of it, leaving room for 8 rows at Style.space(44) plus spacing.
-  // Everything here scales through Style.space(), so the count holds across
-  // themes with a different spacing or font scale.
-  readonly property int maxVisibleRows: 8
+  // The list scrolls rather than growing past the card's height cap. Deriving
+  // the row count from the cap and the chrome above the list keeps it correct
+  // if either changes, instead of restating today's answer as a constant.
+  readonly property real cardHeightCap: Style.space(560)
+  // Hero, totals line, separator, search field, section header, Column spacings.
+  readonly property real listChromeHeight: Style.space(184)
+  // Must match FileRow's implicitHeight.
+  readonly property real rowHeight: Style.space(44)
+  readonly property real rowSpacing: Style.space(2)
+  readonly property int maxVisibleRows:
+    Math.max(3, Math.floor((cardHeightCap - listChromeHeight + rowSpacing) / (rowHeight + rowSpacing)))
   readonly property real maxListHeight:
-    Style.space(44) * maxVisibleRows + Style.space(2) * (maxVisibleRows - 1)
+    rowHeight * maxVisibleRows + rowSpacing * (maxVisibleRows - 1)
 
   property string query: ""
   property int cursor: 0
   property var pendingTrash: null
 
-  property string toastMessage: ""
-
-  Timer {
-    id: toastTimer
-    interval: 2500
-    repeat: false
-    onTriggered: root.toastMessage = ""
-  }
-
   Connections {
     target: root.service
     function onActionCompleted(action, name, success) {
       if (!success) return
-      var text = Model.actionToastMessage(action, name)
-      if (text === "") return
-      root.toastMessage = text
-      toastTimer.restart()
+      toast.show(Model.actionToastMessage(action, name))
     }
   }
 
-  readonly property var visibleEntries: {
-    if (!service) return []
-    var safeEntries = Model.withoutDownloadPlaceholders(service.entries)
-    var filtered = Model.filterEntries(query, safeEntries)
-    return query.trim() === "" ? filtered.slice(0, recentCount) : filtered
-  }
+  readonly property var visibleEntries:
+    service ? Model.visibleEntries(query, service.entries, recentCount) : []
 
   onVisibleEntriesChanged: if (cursor >= visibleEntries.length) cursor = Math.max(0, visibleEntries.length - 1)
 
@@ -96,15 +89,12 @@ Panel {
   onSettingsChanged: pushSettings()
   Component.onDestruction: if (service) service.unregisterPanel(root)
 
-  // service.anyPanelOpen is derived from the registered panels' own `opened`
-  // state (see Service.qml) — this handler no longer needs to push it.
   onOpenedChanged: {
     if (opened) {
       query = ""
       cursor = 0
       pendingTrash = null
-      toastTimer.stop()
-      toastMessage = ""
+      toast.clear()
       Qt.callLater(function () { searchField.forceActiveFocus() })
     }
   }
@@ -119,6 +109,16 @@ Panel {
     if (!entry || !service) return
     if (confirmTrash) pendingTrash = entry
     else service.trashFile(entry.path)
+  }
+
+  // Delete reaches this handler before the search field's own editing, so
+  // claiming it unconditionally would make forward-delete impossible while
+  // typing a query — and with "Confirm before trashing" off, a mistyped
+  // correction would trash a file outright. Plain Delete therefore only
+  // trashes while the query is empty (the list is being navigated, not
+  // edited); Shift+Delete always does, for use mid-search.
+  function trashShortcutApplies(event) {
+    return (event.modifiers & Qt.ShiftModifier) || query === ""
   }
 
   implicitWidth: button.implicitWidth
@@ -177,7 +177,7 @@ Panel {
     open: root.opened
     focusTarget: searchField
     contentWidth: panel.fittedContentWidth(Style.space(400))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(560))
+    contentHeight: panel.fittedContentHeight(column.implicitHeight, root.cardHeightCap)
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -306,7 +306,7 @@ Panel {
             } else if (event.key === Qt.Key_Escape) {
               if (root.query !== "") { root.query = "" } else { root.close() }
               event.accepted = true
-            } else if (event.key === Qt.Key_Delete) {
+            } else if (event.key === Qt.Key_Delete && root.trashShortcutApplies(event)) {
               root.requestTrash(root.visibleEntries[root.cursor])
               event.accepted = true
             }
@@ -348,7 +348,7 @@ Panel {
             id: fileList
             width: parent.width
             height: Math.min(contentHeight, root.maxListHeight)
-            spacing: Style.space(2)
+            spacing: root.rowSpacing
             clip: true
             // Rubber-band overscroll reads as a glitch in a small popout card.
             boundsBehavior: Flickable.StopAtBounds
@@ -395,37 +395,11 @@ Panel {
           }
         }
 
-        Rectangle {
-          id: toastBanner
-          readonly property int horizontalPadding: Style.space(12)
+        ActionToast {
+          id: toast
           width: parent.width
-          height: root.toastMessage !== "" ? implicitHeight : 0
-          implicitHeight: toastText.implicitHeight + Style.space(16)
-          clip: true
-          radius: Style.space(6)
-          color: Util.alpha(Color.accent, 0.15)
-          border.color: Color.accent
-          border.width: 1
-          visible: height > 0
-
-          Behavior on height {
-            NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
-          }
-
-          Text {
-            id: toastText
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.leftMargin: toastBanner.horizontalPadding
-            anchors.rightMargin: toastBanner.horizontalPadding
-            text: "✓ " + root.toastMessage
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            wrapMode: Text.WordWrap
-            horizontalAlignment: Text.AlignLeft
-          }
+          foreground: root.foreground
+          fontFamily: root.fontFamily
         }
       }
 
