@@ -44,14 +44,33 @@ All pure logic (sorting, search, size formatting, partial-download and stall det
 
 - `main` — releases only, tagged `vX.Y.Z`.
 - `development` — integration branch; open PRs against this.
-- Work branches: `feat/<topic>`, `fix/<topic>`, `chore/<topic>`, `docs/<topic>`.
+- Work branches: `feat/<topic>`, `fix/<topic>`, `chore/<topic>`, `docs/<topic>`, `hotfix/<topic>`.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org): `feat: ...`, `fix: ...`, `docs: ...`, etc.
 
 ## Releases
 
+`omarchy plugin update` tracks the default branch's HEAD, so **merging to `main` is what ships to users** — the tag does not. Tag in the same sitting as the merge, or people are already running the new version with no GitHub Release to match it. Keep `main` releasable at all times.
+
 1. On `development`: bump `version` in `manifest.json`, update `CHANGELOG.md`, commit as `chore(release): vX.Y.Z`.
 2. Merge `development` into `main`.
 3. Tag: `git tag vX.Y.Z && git push origin main vX.Y.Z` — the release workflow verifies the tag matches the manifest and publishes a GitHub Release.
+
+There is deliberately no long-lived `release/*` branch. Its only real benefit is letting features keep landing on `development` while a release stabilizes, which isn't worth the extra merge and the risk of `main` and `development` drifting apart at this size. Add one if a release ever needs a stabilization window that outlasts the work queued behind it.
+
+## Hotfixes
+
+An urgent fix to a released version branches from `main`, not `development`, so it can ship on its own without dragging along whatever else has landed since the release:
+
+```bash
+git checkout main && git pull
+git checkout -b hotfix/<topic>
+# fix it, bump the patch version in manifest.json, add a CHANGELOG entry
+git checkout main && git merge --no-ff hotfix/<topic>
+git tag vX.Y.Z && git push origin main vX.Y.Z
+git checkout development && git merge --no-ff main    # back-merge — do not skip
+```
+
+The back-merge is the step that is easy to forget and expensive to miss: without it the fix lives only on `main` and quietly disappears from the next release cut from `development`.
 
 ## Security expectations
 
