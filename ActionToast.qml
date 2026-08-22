@@ -20,8 +20,8 @@ Rectangle {
   readonly property string message: _message
   property string _message: ""
 
-  readonly property int horizontalPadding: Style.space(12)
-  readonly property int verticalPadding: Style.space(8)
+  // One value for all four sides so the text sits symmetrically in the box.
+  readonly property int contentPadding: Style.space(14)
 
   function show(text) {
     if (!text) return
@@ -64,15 +64,18 @@ Rectangle {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: parent.top
-    anchors.leftMargin: root.horizontalPadding
-    anchors.rightMargin: root.horizontalPadding
-    topPadding: root.verticalPadding
-    bottomPadding: root.verticalPadding
+    anchors.leftMargin: root.contentPadding
+    anchors.rightMargin: root.contentPadding
+    topPadding: root.contentPadding
+    bottomPadding: root.contentPadding
     text: "✓ " + root._message
     color: root.foreground
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall
-    wrapMode: Text.WordWrap
+    // Text.Wrap, not WordWrap: file names are often one unbroken "word"
+    // wider than the banner, and WordWrap lets those overflow past the
+    // padding into the border instead of breaking mid-name.
+    wrapMode: Text.Wrap
     horizontalAlignment: Text.AlignLeft
   }
 }

@@ -47,10 +47,20 @@ Panel {
   // Must match FileRow's implicitHeight.
   readonly property real rowHeight: Style.space(44)
   readonly property real rowSpacing: Style.space(2)
-  readonly property int maxVisibleRows:
-    Math.max(3, Math.floor((cardHeightCap - listChromeHeight + rowSpacing) / (rowHeight + rowSpacing)))
-  readonly property real maxListHeight:
-    rowHeight * maxVisibleRows + rowSpacing * (maxVisibleRows - 1)
+  // The list's cap is quantized to whole rows: the clipping ListView must
+  // cap on a row boundary, or a sliced last row reads as whatever sits
+  // below it overlapping the list.
+  readonly property int maxVisibleRows: Model.listRowsThatFit(
+    cardHeightCap - listChromeHeight, rowHeight, rowSpacing, 3)
+  readonly property real maxListHeight: Model.listHeightForRows(maxVisibleRows, rowHeight, rowSpacing)
+  // Extra standoff above the banner beyond the column's own spacing, so it
+  // reads as a separate element rather than a footer glued to the list.
+  readonly property real toastGap: Style.space(16)
+  // The toast must never displace list content: when it appears, the card
+  // grows by its footprint instead of the list giving up a row (which reads
+  // as the banner overlaying the last row). The cap only bounds the list.
+  readonly property real toastReservedHeight:
+    toast.height > 0 ? toast.height + toastGap + column.spacing : 0
 
   property string query: ""
   property int cursor: 0
@@ -177,7 +187,7 @@ Panel {
     open: root.opened
     focusTarget: searchField
     contentWidth: panel.fittedContentWidth(Style.space(400))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, root.cardHeightCap)
+    contentHeight: panel.fittedContentHeight(column.implicitHeight, root.cardHeightCap + root.toastReservedHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -395,11 +405,21 @@ Panel {
           }
         }
 
-        ActionToast {
-          id: toast
+        // Spacer wrapper: a Column can't give one child extra margin, so the
+        // standoff is baked into this item's height. Bottom-anchoring the
+        // banner keeps the extra space above it, and the whole thing
+        // collapses to 0 with the toast.
+        Item {
           width: parent.width
-          foreground: root.foreground
-          fontFamily: root.fontFamily
+          height: toast.height > 0 ? toast.height + root.toastGap : 0
+
+          ActionToast {
+            id: toast
+            width: parent.width
+            anchors.bottom: parent.bottom
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+          }
         }
       }
 

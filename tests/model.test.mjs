@@ -315,3 +315,29 @@ test("actionToastMessage keeps the full file name for a long name (banner wraps)
 test("actionToastMessage returns an empty string for an unknown action", () => {
   assert.equal(Model.actionToastMessage("rename", "report.pdf"), "");
 });
+
+test("listRowsThatFit fits an exact whole-row multiple", () => {
+  // 8 rows of 44 with 2 spacing between: 8*44 + 7*2 = 366
+  assert.equal(Model.listRowsThatFit(366, 44, 2, 3), 8);
+});
+
+test("listRowsThatFit rounds a partial leftover down, never slicing a row", () => {
+  assert.equal(Model.listRowsThatFit(365, 44, 2, 3), 7);
+  assert.equal(Model.listRowsThatFit(366 + 45, 44, 2, 3), 8);
+});
+
+test("listRowsThatFit drops a row when a toast eats into the budget", () => {
+  const eightRows = 366;
+  const toast = 33 + 12; // banner + column spacing
+  assert.equal(Model.listRowsThatFit(eightRows - toast, 44, 2, 3), 7);
+});
+
+test("listRowsThatFit never goes below minRows", () => {
+  assert.equal(Model.listRowsThatFit(10, 44, 2, 3), 3);
+  assert.equal(Model.listRowsThatFit(-100, 44, 2, 3), 3);
+});
+
+test("listHeightForRows is the whole-row height including inner spacing", () => {
+  assert.equal(Model.listHeightForRows(8, 44, 2), 366);
+  assert.equal(Model.listHeightForRows(1, 44, 2), 44);
+});
