@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com), and the project adheres to
 [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Security
+- Bounded the resource use of folder scanning, flagged in marketplace review: `resync()` now processes at most 2,000 of the newest folder entries per pass instead of the whole folder unconditionally, `bin/downloads-stats` caps its recursive walk (`-maxdepth 20`, 20,000 files, 10s `timeout`), and the shell kills `downloads-stats` outright if it's still running 15s after being started. Filesystem-derived text (file names, error messages naming a path) is now always rendered as plain text instead of Qt's default `AutoText`, which could otherwise interpret a crafted file name as rich-text markup (e.g. an `<img>` tag pulling a remote URL).
+
 ## [1.0.0] - 2026-08-22
 
 ### Added

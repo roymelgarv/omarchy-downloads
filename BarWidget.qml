@@ -334,6 +334,10 @@ Panel {
           visible: !!root.service && root.service.lastError !== ""
           width: parent.width
           text: root.service ? root.service.lastError : ""
+          // bin/ helpers echo the failing path into stderr on error, so
+          // this can carry a filesystem-controlled file name — force plain
+          // text so it can't get promoted to RichText by AutoText.
+          textFormat: Text.PlainText
           color: root.urgent
           font.family: root.fontFamily
           font.pixelSize: Style.font.bodySmall

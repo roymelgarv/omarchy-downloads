@@ -19,14 +19,31 @@
 # `-mindepth 1` keeps the watched folder itself out of that name test —
 # without it, pointing the plugin at a hidden folder (~/.downloads) prunes
 # the search at its own root and reports zero.
+#
+# This runs on a timer from the long-lived shell process (Service.qml), so a
+# huge or adversarial tree under the watched folder must not be able to keep
+# it busy indefinitely: MAX_DEPTH bounds how far find recurses, MAX_FILES
+# bounds how many files get counted (past that many, bytes/count become a
+# floor rather than an exact total — `head` closing early also stops `find`
+# from walking any further once the cap is hit), and DEADLINE is a hard
+# wall-clock backstop in case a slow/huge/network-mounted tree still
+# outruns those. `|| true` on the inner pipeline keeps a `head`-induced
+# SIGPIPE or a `timeout` kill from tripping `set -e` on this line — a
+# partial count from whatever was piped through before the cutoff is the
+# intended degraded result, not a script failure.
 set -euo pipefail
+
+MAX_DEPTH=20
+MAX_FILES=20000
+DEADLINE=10
 
 dir="${1:?usage: downloads-stats <folder>}"
 [[ -d "$dir" ]] || { echo "downloads-stats: no such folder: $dir" >&2; exit 1; }
 
 read -r bytes count < <(
-  find "$dir" -mindepth 1 -name '.*' -prune -o -type f -printf '%s\n' |
-    awk '{ sum += $1; n++ } END { printf "%d %d\n", sum, n }'
+  { timeout "$DEADLINE" find "$dir" -maxdepth "$MAX_DEPTH" -mindepth 1 -name '.*' -prune -o -type f -printf '%s\n' |
+    head -n "$MAX_FILES" |
+    awk '{ sum += $1; n++ } END { printf "%d %d\n", sum+0, n+0 }'; } || true
 )
 
-printf '{"bytes": %s, "count": %s}\n' "$bytes" "$count"
+printf '{"bytes": %s, "count": %s}\n' "${bytes:-0}" "${count:-0}"

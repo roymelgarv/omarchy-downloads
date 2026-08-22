@@ -92,9 +92,13 @@ Item {
     showDirs: false
     showHidden: false
     showOnlyReadable: true
-    // Sorting is done in Model.js from the extracted entries; the model's own
-    // order is irrelevant, but Time keeps incremental updates cheap.
+    // Final tie-broken ordering is still done in Model.js from the extracted
+    // entries, but sortReversed here does matter now: resync() below only
+    // walks the first _maxTrackedEntries of files.count, so that window has
+    // to already be Qt's own newest-first Time order for it to mean "the
+    // most recent entries" rather than an arbitrary slice.
     sortField: FolderListModel.Time
+    sortReversed: true
 
     onCountChanged: root.scheduleResync()
     onStatusChanged: if (status === FolderListModel.Ready) root.scheduleResync()
@@ -124,10 +128,20 @@ Item {
     onTriggered: root.resync()
   }
 
+  // Practical ceiling on how many folder entries a single resync() copies,
+  // partial-tracks, sorts and diffs. Without one, an unbounded (or
+  // adversarial) downloads folder makes every FolderListModel change — and
+  // the 2s in-flight-download poll below — redo full-tree work forever, in
+  // the shell's one long-lived singleton instance. Search and the recent
+  // list only ever see this many of the newest files once a folder exceeds
+  // it, which is the trade a bar-widget recent-downloads list can afford.
+  readonly property int _maxTrackedEntries: 2000
+
   function resync() {
     var out = []
     var names = []
-    for (var i = 0; i < files.count; i++) {
+    var count = Math.min(files.count, root._maxTrackedEntries)
+    for (var i = 0; i < count; i++) {
       var name = String(files.get(i, "fileName"))
       var modified = files.get(i, "fileModified")
       out.push({
@@ -301,6 +315,26 @@ Item {
       if (statsProcess.running) { statsDebounce.restart(); return }
       statsProcess.command = ["bash", root.pluginDir + "/bin/downloads-stats", root.folder]
       statsProcess.running = true
+      statsDeadline.restart()
+    }
+  }
+
+  // Backstop for downloads-stats' own internal timeout: that guards against
+  // a slow/huge tree, but if the helper somehow doesn't come back at all —
+  // a missing `timeout` binary, a wedged bash — this is what actually stops
+  // it rather than leaving it running forever in the shell's long-lived
+  // process. SIGKILL (9), not a softer signal: this only fires once the
+  // helper is already well past every bound it's supposed to respect, so
+  // there's nothing left to let it clean up.
+  Timer {
+    id: statsDeadline
+    interval: 15000
+    repeat: false
+    onTriggered: {
+      if (statsProcess.running) {
+        console.warn("omarchy-downloads: downloads-stats exceeded its deadline; killing it")
+        statsProcess.signal(9)
+      }
     }
   }
 
@@ -322,6 +356,7 @@ Item {
         }
       }
     }
+    onExited: statsDeadline.stop()
   }
 
   function openFile(path) {
