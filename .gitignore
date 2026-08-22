@@ -1,3 +1,6 @@
 node_modules/
 *.log
 .DS_Store
+
+# Local agent guide — kept out of the public repo
+CLAUDE.md
