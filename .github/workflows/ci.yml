@@ -69,4 +69,4 @@ jobs:
           if [ -z "$QMLLINT" ]; then
             echo "qmllint not found, skipping"; exit 0
           fi
-          "$QMLLINT" BarWidget.qml FileRow.qml Service.qml || true
+          "$QMLLINT" ./*.qml || true

@@ -13,7 +13,14 @@ scripts/dev.sh            # deploy to ~/.config/omarchy/plugins/ and validate
 omarchy plugin enable roymelgarv.omarchy-downloads --section right
 ```
 
-The Omarchy shell hot-reloads plugin files automatically when they change under `~/.config/omarchy/plugins/`. Use `scripts/dev.sh --watch` to redeploy on every save. QML errors appear in `journalctl --user -f`.
+`scripts/dev.sh` deploys to `~/.config/omarchy/plugins/`, validates the manifest, and asks the shell to rescan. Use `scripts/dev.sh --watch` to redeploy on every save.
+
+Hot reload has two limits worth knowing before you debug a change that "didn't work":
+
+- A running `kind: "service"` instance is **never** reinstantiated. Any `Service.qml` edit needs `scripts/dev.sh --restart`, which deploys and then blocks until a *new* shell pid is answering IPC.
+- Even for widget-only files, a rescan has been observed to keep rendering the previously compiled component after a *structural* change (a new child item or a changed root type — not just a property tweak). If an edit doesn't appear, diff the deployed file against your working tree to rule out a bad deploy, then redeploy with `--restart` before assuming the code is wrong.
+
+QML errors appear in `journalctl --user -f`.
 
 Useful IPC commands while developing:
 
@@ -26,12 +33,12 @@ omarchy-shell shell rescanPlugins       # force a rescan
 ## Tests
 
 ```bash
-node --test tests/*.test.mjs          # Model.js unit tests — must pass
-shellcheck bin/* scripts/*.sh
-bats tests/bin.bats         # bin script tests
+node --test tests/*.test.mjs                     # Model.js unit tests — must pass
+shellcheck -x -P SCRIPTDIR bin/* scripts/*.sh    # same flags CI uses, so lib.sh resolves
+bats tests/bin.bats                              # bin script tests
 ```
 
-All pure logic (sorting, search, size formatting, partial-download detection) lives in `Model.js` and must be covered by unit tests. QML files stay thin; the manual UI checklist is `tests/qa-checklist.md`.
+All pure logic (sorting, search, size formatting, partial-download and stall detection) lives in `Model.js` and must be covered by unit tests. QML files stay thin; the manual UI checklist is `tests/qa-checklist.md`.
 
 ## Branches and commits
 
