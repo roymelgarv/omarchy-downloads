@@ -93,12 +93,19 @@ Item {
     showHidden: false
     showOnlyReadable: true
     // Final tie-broken ordering is still done in Model.js from the extracted
-    // entries, but sortReversed here does matter now: resync() below only
-    // walks the first _maxTrackedEntries of files.count, so that window has
-    // to already be Qt's own newest-first Time order for it to mean "the
-    // most recent entries" rather than an arbitrary slice.
+    // entries, but this model's own order matters now that resync() below
+    // only walks the first _maxTrackedEntries of files.count: that window
+    // has to already be newest-first for it to mean "the most recent
+    // entries" rather than an arbitrary slice.
+    //
+    // Time alone is what gives that. It maps to QDir::Time, which is
+    // *already* most-recent-first, so sortReversed must stay at its default
+    // false — setting it true flips the model to oldest-first, and the cap
+    // would then silently hold the 2,000 oldest files while Model.js
+    // re-sorted that wrong window newest-first, so the list would look
+    // correctly ordered and never show a recent download. Verified against
+    // Qt 6 with a three-file fixture rather than taken from the docs.
     sortField: FolderListModel.Time
-    sortReversed: true
 
     onCountChanged: root.scheduleResync()
     onStatusChanged: if (status === FolderListModel.Ready) root.scheduleResync()
@@ -240,6 +247,25 @@ Item {
     confirmProcess._name = next.name
     confirmProcess.command = ["bash", pluginDir + "/bin/downloads-file-size", next.path]
     confirmProcess.running = true
+    confirmDeadline.restart()
+  }
+
+  // downloads-file-size is a single stat() and should return instantly, but
+  // stat() on a wedged network mount blocks indefinitely — and _confirmRunning
+  // gates the whole FIFO, so one hung check would stop every later
+  // confirmation from ever running while _confirmQueue kept growing. Killing
+  // it self-heals: onExited already treats a nonzero exit as "skip this one
+  // and let the next resync decide".
+  Timer {
+    id: confirmDeadline
+    interval: 10000
+    repeat: false
+    onTriggered: {
+      if (confirmProcess.running) {
+        console.warn("omarchy-downloads: downloads-file-size exceeded its deadline; killing it")
+        confirmProcess.signal(9)
+      }
+    }
   }
 
   property Process confirmProcess: Process {
@@ -251,6 +277,7 @@ Item {
       waitForEnd: true
     }
     onExited: function (exitCode) {
+      confirmDeadline.stop()
       var name = confirmProcess._name
       delete root._pendingConfirmations[name]
       if (exitCode === 0) {

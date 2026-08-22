@@ -27,23 +27,37 @@
 # floor rather than an exact total — `head` closing early also stops `find`
 # from walking any further once the cap is hit), and DEADLINE is a hard
 # wall-clock backstop in case a slow/huge/network-mounted tree still
-# outruns those. `|| true` on the inner pipeline keeps a `head`-induced
-# SIGPIPE or a `timeout` kill from tripping `set -e` on this line — a
-# partial count from whatever was piped through before the cutoff is the
-# intended degraded result, not a script failure.
+# outruns those.
+#
+# Hitting any of the three is a degraded result, not a failure: awk's END
+# block runs whether the input ended naturally, because `head` closed the
+# pipe, or because `timeout` killed `find`, so it always emits a line and
+# the `read` below always succeeds. (`set -e` never sees the inner
+# pipeline's status at all — a process substitution's exit code is
+# discarded by the shell.) The totals simply become a floor.
 set -euo pipefail
 
-MAX_DEPTH=20
-MAX_FILES=20000
-DEADLINE=10
+# Overridable so the test suite can exercise the caps without building a
+# 20,000-file fixture; nothing but the tests is expected to set these.
+MAX_DEPTH="${DOWNLOADS_STATS_MAX_DEPTH:-20}"
+MAX_FILES="${DOWNLOADS_STATS_MAX_FILES:-20000}"
+DEADLINE="${DOWNLOADS_STATS_DEADLINE:-10}"
 
 dir="${1:?usage: downloads-stats <folder>}"
 [[ -d "$dir" ]] || { echo "downloads-stats: no such folder: $dir" >&2; exit 1; }
 
+# Checked explicitly because a missing `timeout` would otherwise make the
+# pipeline below emit nothing at all, which awk still reports as "0 0" — the
+# panel would show "0 B total · 0 files" over a full folder, with nothing in
+# the log to explain it. Failing loudly here keeps that a visible error
+# rather than a silently wrong total.
+command -v timeout >/dev/null 2>&1 ||
+  { echo "downloads-stats: 'timeout' not found (coreutils required)" >&2; exit 1; }
+
 read -r bytes count < <(
-  { timeout "$DEADLINE" find "$dir" -maxdepth "$MAX_DEPTH" -mindepth 1 -name '.*' -prune -o -type f -printf '%s\n' |
+  timeout "$DEADLINE" find "$dir" -maxdepth "$MAX_DEPTH" -mindepth 1 -name '.*' -prune -o -type f -printf '%s\n' |
     head -n "$MAX_FILES" |
-    awk '{ sum += $1; n++ } END { printf "%d %d\n", sum+0, n+0 }'; } || true
+    awk '{ sum += $1; n++ } END { printf "%d %d\n", sum+0, n+0 }'
 )
 
 printf '{"bytes": %s, "count": %s}\n' "${bytes:-0}" "${count:-0}"
