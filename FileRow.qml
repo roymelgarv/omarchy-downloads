@@ -39,6 +39,22 @@ Item {
 
   implicitHeight: Style.space(44)
 
+  // Cycles 1/2/3 trailing dots on "downloading" while active. A Timer, not a
+  // RotationAnimator/NumberAnimation: Qt Quick pauses its per-window
+  // animation driver while the popout is closed (reproduced live — a
+  // RotationAnimator-driven spinner froze mid-rotation on close and stayed
+  // frozen after reopening until some unrelated repaint happened to kick it).
+  // A Timer runs on the normal event loop regardless of window visibility, so
+  // this always shows the right dot count the instant the panel reopens.
+  property int _downloadingDots: 1
+  Timer {
+    interval: 500
+    repeat: true
+    running: root.activelyDownloading
+    onTriggered: root._downloadingDots = (root._downloadingDots % 3) + 1
+    onRunningChanged: if (!running) root._downloadingDots = 1
+  }
+
   Rectangle {
     anchors.fill: parent
     radius: Style.cornerRadius
@@ -117,7 +133,7 @@ Item {
       Text {
         width: parent.width
         text: {
-          if (root.activelyDownloading) return "downloading…"
+          if (root.activelyDownloading) return "downloading" + "...".slice(0, root._downloadingDots)
           if (root.stalled) return "Stalled — download incomplete"
           var sizeText = Model.humanSize(root.entry.size)
           return root.ext !== "" ? sizeText + " · ." + root.ext.toUpperCase() : sizeText
@@ -136,23 +152,6 @@ Item {
     anchors.rightMargin: Style.space(6)
     anchors.verticalCenter: parent.verticalCenter
     spacing: Style.space(2)
-
-    Text {
-      visible: root.activelyDownloading
-      anchors.verticalCenter: parent.verticalCenter
-      text: "󱥸"
-      color: root.accent
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.icon
-
-      RotationAnimator on rotation {
-        running: root.activelyDownloading
-        from: 0
-        to: 360
-        duration: 800
-        loops: Animation.Infinite
-      }
-    }
 
     PanelActionButton {
       visible: root.hot && root.actionable

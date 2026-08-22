@@ -12,11 +12,11 @@ this — these are the interactions only a human can judge.
 - [ ] Long file names elide in the middle without breaking the row layout
 
 ## Live tracking
-- [ ] Download a real file in a browser (Chrome and Firefox, if both available): a downloading row appears, reading just "downloading…" (no size)
-- [ ] The downloading row shows a spinning dot-ring icon where the reveal/copy/trash actions normally appear
+- [ ] Download a real file in a browser (Chrome and Firefox, if both available): a downloading row appears, its label cycling "downloading." / ".." / "..." roughly twice a second
+- [ ] Close the popout panel for several seconds while the download is still active, then reopen it: the dot cycle is still advancing normally, not frozen on whatever count it showed when closed
 - [ ] If the browser creates a zero-byte placeholder file under the final download name while downloading, it does NOT appear anywhere in the list (search for it by name too — it still shouldn't show)
 - [ ] The bar icon pulses (fades in/out on a loop) while the download is in progress
-- [ ] When it finishes, the row becomes a normal file at the top of the list (showing its real size again), its spinner is replaced by the usual hover actions, and the bar icon stops pulsing and returns to full opacity
+- [ ] When it finishes, the row becomes a normal file at the top of the list (showing its real size again), the reveal/copy/trash actions work normally on hover, and the bar icon stops pulsing and returns to full opacity
 - [ ] With the panel closed, finishing a download shows the badge dot on the bar icon
 - [ ] Opening the panel clears the badge
 - [ ] Start a download, then freeze it (kill the browser mid-download, or disconnect networking) and wait ~30-40s: the row switches to a static, urgent-toned "Stalled — download incomplete" label, the bar icon/header stop indicating an active download, and reveal/trash become available on hover while copy stays hidden
