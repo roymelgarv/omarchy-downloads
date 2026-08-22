@@ -64,6 +64,12 @@ Panel {
 
   property string query: ""
   property int cursor: 0
+  // cursor always holds a valid index (defaulting to 0) so Enter/Delete has
+  // something sensible to act on immediately, but that default shouldn't
+  // *look* selected before the user has actually navigated to it — only an
+  // arrow-key press earns the row a highlight; hover already highlights
+  // independently via FileRow's own containsMouse.
+  property bool keyboardActive: false
   property var pendingTrash: null
 
   Connections {
@@ -103,6 +109,7 @@ Panel {
     if (opened) {
       query = ""
       cursor = 0
+      keyboardActive = false
       pendingTrash = null
       toast.clear()
       Qt.callLater(function () { searchField.forceActiveFocus() })
@@ -305,9 +312,11 @@ Panel {
               return
             }
             if (event.key === Qt.Key_Down) {
+              root.keyboardActive = true
               root.cursor = Math.min(root.cursor + 1, root.visibleEntries.length - 1)
               event.accepted = true
             } else if (event.key === Qt.Key_Up) {
+              root.keyboardActive = true
               root.cursor = Math.max(root.cursor - 1, 0)
               event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
@@ -375,7 +384,7 @@ Panel {
               // view, so parent.width would be wrong here.
               width: ListView.view.width
               entry: modelData
-              selected: index === root.cursor
+              selected: root.keyboardActive && index === root.cursor
               foreground: root.foreground
               dim: root.dim
               accent: Color.accent
