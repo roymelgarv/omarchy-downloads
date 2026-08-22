@@ -124,3 +124,15 @@ teardown() {
   run "$BIN/downloads-reveal"
   [ "$status" -ne 0 ]
 }
+
+@test "downloads-file-size reports a file's real on-disk byte size" {
+  printf 'aaaaaaaa' > "$FIXTURE/growing.part"   # 8 bytes
+  run "$BIN/downloads-file-size" "$FIXTURE/growing.part"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 8 ]
+}
+
+@test "downloads-file-size fails cleanly on a missing file" {
+  run "$BIN/downloads-file-size" "$FIXTURE/ghost.part"
+  [ "$status" -ne 0 ]
+}

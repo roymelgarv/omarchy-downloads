@@ -139,9 +139,50 @@ function entriesEqual(a, b) {
   if (!a || !b || a.length !== b.length) return false;
   for (var i = 0; i < a.length; i++) {
     if (a[i].name !== b[i].name || a[i].size !== b[i].size ||
-        a[i].mtime !== b[i].mtime || a[i].partial !== b[i].partial) return false;
+        a[i].mtime !== b[i].mtime || a[i].partial !== b[i].partial ||
+        a[i].stalled !== b[i].stalled) return false;
   }
   return true;
+}
+
+var PARTIAL_STALL_MS = 20000;
+
+// Advances per-partial-file size/staleness tracking by one resync tick, so a
+// partial download whose bytes stop arriving (an aborted/failed download,
+// not just a slow one) can be told apart from one still actively growing.
+// `history` is keyed by file name -> {size, lastChanged}; rebuilt from
+// scratch each call using only the entries passed in, which is what drops a
+// completed/renamed/removed file's history automatically — no separate
+// cleanup needed elsewhere. `now` is a required param (not Date.now()
+// internally) to stay unit-testable, matching this file's convention.
+// Object.create(null), not {}: a file literally named "constructor" must not
+// read back a bogus prototype-chain hit as its previous size (same class of
+// bug fixed in completedSince above).
+//
+// The result's `candidateStalled` is a *suspicion*, not the final word:
+// Qt's FolderListModel.fileSize (the only signal this function sees) does
+// not reliably refresh while a file is being actively written — reproduced
+// live by growing a real file every 2s for 18s and watching this flag trip
+// anyway. Service.qml treats candidateStalled as "worth confirming with a
+// real stat()" rather than "definitely stalled"; only that confirmation
+// (see Service.qml's confirmStall()) sets the final `stalled` shown in the UI.
+function trackPartialProgress(history, entries, now, stallThresholdMs) {
+  var prevHistory = history || Object.create(null);
+  var nextHistory = Object.create(null);
+  var out = [];
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    if (e.partial !== true) {
+      out.push({ name: e.name, path: e.path, size: e.size, mtime: e.mtime, partial: e.partial, candidateStalled: false });
+      continue;
+    }
+    var prev = prevHistory[e.name];
+    var lastChanged = (prev && prev.size === e.size) ? prev.lastChanged : now;
+    nextHistory[e.name] = { size: e.size, lastChanged: lastChanged };
+    out.push({ name: e.name, path: e.path, size: e.size, mtime: e.mtime, partial: e.partial,
+      candidateStalled: (now - lastChanged) >= stallThresholdMs });
+  }
+  return { history: nextHistory, entries: out };
 }
 
 // Whether the folder still holds exactly the same file names in the same
@@ -202,6 +243,8 @@ if (typeof module !== "undefined" && module.exports) {
     withoutDownloadPlaceholders: withoutDownloadPlaceholders,
     visibleEntries: visibleEntries,
     entriesEqual: entriesEqual,
+    trackPartialProgress: trackPartialProgress,
+    PARTIAL_STALL_MS: PARTIAL_STALL_MS,
     namesEqual: namesEqual,
     completedSince: completedSince,
     elideMiddle: elideMiddle,

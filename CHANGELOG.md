@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 - Success toast banner ("Moved … to trash" / "Copied … to clipboard") shown after a quick action completes, auto-dismissing after ~2.5s.
+- Stalled-download detection: a partial download whose size stops changing (an aborted or failed download, not just a slow one) is flagged "Stalled — download incomplete" and becomes actionable (reveal/trash) instead of being stuck non-actionable forever; the bar icon and header stop indicating it as an active download. A suspected stall is double-checked against the file's real on-disk size (`bin/downloads-file-size`) before being shown as stalled, since the cached size Quickshell reports while a file is being actively written can itself lag for many seconds — so a genuinely active download is never misflagged, at the cost of taking up to ~40s to confirm a truly dead one.
 
 ### Changed
 - File names no longer repeat the extension; each row now shows the size and type together below the name (e.g. "130.8 KB · .PNG").
@@ -17,6 +18,7 @@ All notable changes to this project are documented here. The format follows
 - The file list is only republished when its contents actually changed, so an unrelated folder event no longer resets the list's scroll position or re-requests every thumbnail.
 
 ### Fixed
+- The in-progress download row's spinning icon could freeze mid-rotation after the panel was closed and reopened, since Qt Quick pauses a window's animations while it isn't visible. Replaced with an animated "downloading." / ".." / "..." dot cycle driven by a Timer, which keeps advancing regardless of the panel's visibility.
 - Search results past the eighth match were drawn outside the popout card, leaving them unreachable by mouse and keyboard. The file list now scrolls once it exceeds eight rows, and arrow-key navigation keeps the selected row in view.
 - Folder totals read "0 B · 0 files" whenever the watched folder was itself hidden (`~/.downloads`) or lived under a hidden directory (`~/.local/share/downloads`), because the hidden-file filter tested the whole path instead of each entry's own name.
 - A completed download whose name collides with a JavaScript object member (`constructor`, `toString`, …) never raised the completion badge.

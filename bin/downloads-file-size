@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Print a file's real on-disk byte size, bypassing FolderListModel's cached
+# fileSize role — which does not reliably refresh while the file is being
+# actively written (reproduced live: a steadily-growing file's cached size
+# stopped advancing well before the file itself did). Used to confirm a
+# suspected-stalled download against ground truth before flagging it.
+set -euo pipefail
+
+file="${1:?usage: downloads-file-size <file>}"
+[[ -e "$file" ]] || { echo "downloads-file-size: no such file: $file" >&2; exit 1; }
+
+stat -c '%s' -- "$file"

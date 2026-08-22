@@ -110,7 +110,7 @@ Panel {
   }
 
   function activate(entry) {
-    if (!entry || entry.partial === true || !service) return
+    if (!entry || (entry.partial === true && entry.stalled !== true) || !service) return
     service.openFile(entry.path)
     root.close()
   }
