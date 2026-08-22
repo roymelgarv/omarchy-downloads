@@ -163,6 +163,20 @@ function actionToastMessage(action, name) {
   return "";
 }
 
+// How many rows fit *completely* in `available` px. The list view clips, so
+// its height cap must always land on a whole-row boundary: a mid-row cap
+// slices the last row in half, which reads as whatever sits below the list
+// (the action toast) overlapping it. Floored at minRows so the list stays
+// usable even when the budget is squeezed.
+function listRowsThatFit(available, rowHeight, rowSpacing, minRows) {
+  return Math.max(minRows, Math.floor((available + rowSpacing) / (rowHeight + rowSpacing)));
+}
+
+// Pixel height of `rows` full rows, including spacing between them only.
+function listHeightForRows(rows, rowHeight, rowSpacing) {
+  return rows * rowHeight + (rows - 1) * rowSpacing;
+}
+
 function elideMiddle(name, max) {
   var s = String(name);
   if (s.length <= max) return s;
@@ -191,6 +205,8 @@ if (typeof module !== "undefined" && module.exports) {
     namesEqual: namesEqual,
     completedSince: completedSince,
     elideMiddle: elideMiddle,
-    actionToastMessage: actionToastMessage
+    actionToastMessage: actionToastMessage,
+    listRowsThatFit: listRowsThatFit,
+    listHeightForRows: listHeightForRows
   };
 }
