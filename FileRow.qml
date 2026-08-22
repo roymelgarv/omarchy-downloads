@@ -23,14 +23,10 @@ Item {
 
   readonly property string ext: Model.extOf(entry.name || "")
   readonly property bool isImage: Model.isImageExt(ext)
-  // Overlapping MouseAreas: Qt Quick delivers hover to the topmost item at
-  // the pointer, so once the cursor moves onto an action button, the row's
-  // own MouseArea stops seeing containsMouse — which would hide the
-  // buttons (visible: root.hot && …) right out from under the cursor,
-  // un-hovering it and flipping hot back true, then false again. Each
-  // PanelActionButton already exposes a hovered(bool) signal for this
-  // exact case; OR-ing it in keeps the row (and the buttons) "hot"
-  // continuously across the row's own area and every button on it.
+  // Qt Quick only delivers hover to the topmost item at the pointer, so
+  // hovering a button would otherwise drop the row's own containsMouse and
+  // hide the buttons (visible: root.hot && …) mid-hover. Each button's own
+  // hovered() signal keeps the row "hot" across itself and all its buttons.
   readonly property bool hot: mouse.containsMouse || selected || _revealHovered || _copyHovered || _trashHovered
   property bool _revealHovered: false
   property bool _copyHovered: false

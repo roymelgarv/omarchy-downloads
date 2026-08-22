@@ -64,11 +64,9 @@ Panel {
 
   property string query: ""
   property int cursor: 0
-  // cursor always holds a valid index (defaulting to 0) so Enter/Delete has
-  // something sensible to act on immediately, but that default shouldn't
-  // *look* selected before the user has actually navigated to it — only an
-  // arrow-key press earns the row a highlight; hover already highlights
-  // independently via FileRow's own containsMouse.
+  // Gates the highlight separately from `cursor`, which defaults to a valid
+  // index so Enter/Delete work immediately — without this, row 0 would look
+  // selected before any real navigation.
   property bool keyboardActive: false
   property var pendingTrash: null
 
