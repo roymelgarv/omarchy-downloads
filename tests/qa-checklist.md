@@ -27,6 +27,7 @@ this — these are the interactions only a human can judge.
 - [ ] If the stalled download resumes growing before being trashed, the row goes back to the normal "downloading…" state on its own
 
 ## Quick actions
+- [ ] Moving the mouse from the row onto its folder/copy/trash buttons keeps the row highlighted and the buttons visible the whole way, with no flicker
 - [ ] Row click opens the file with its default app and closes the panel
 - [ ] Folder icon reveals the file in the file manager (file selected where supported)
 - [ ] Copy icon: paste works in the file manager; paste in a chat/upload also works

@@ -23,7 +23,18 @@ Item {
 
   readonly property string ext: Model.extOf(entry.name || "")
   readonly property bool isImage: Model.isImageExt(ext)
-  readonly property bool hot: mouse.containsMouse || selected
+  // Overlapping MouseAreas: Qt Quick delivers hover to the topmost item at
+  // the pointer, so once the cursor moves onto an action button, the row's
+  // own MouseArea stops seeing containsMouse — which would hide the
+  // buttons (visible: root.hot && …) right out from under the cursor,
+  // un-hovering it and flipping hot back true, then false again. Each
+  // PanelActionButton already exposes a hovered(bool) signal for this
+  // exact case; OR-ing it in keeps the row (and the buttons) "hot"
+  // continuously across the row's own area and every button on it.
+  readonly property bool hot: mouse.containsMouse || selected || _revealHovered || _copyHovered || _trashHovered
+  property bool _revealHovered: false
+  property bool _copyHovered: false
+  property bool _trashHovered: false
   // A stalled partial (its bytes stopped arriving — an aborted/failed
   // download, not just a slow one) is treated like any other file: it keeps
   // its .part/.crdownload name, but the row becomes actionable so it can be
@@ -159,6 +170,7 @@ Item {
       foreground: root.foreground
       fontFamily: root.fontFamily
       onClicked: root.revealRequested()
+      onHovered: function (isHovered) { root._revealHovered = isHovered }
     }
 
     PanelActionButton {
@@ -169,6 +181,7 @@ Item {
       foreground: root.foreground
       fontFamily: root.fontFamily
       onClicked: root.copyRequested()
+      onHovered: function (isHovered) { root._copyHovered = isHovered }
     }
 
     PanelActionButton {
@@ -180,6 +193,7 @@ Item {
       hoverColor: Color.urgent
       fontFamily: root.fontFamily
       onClicked: root.trashRequested()
+      onHovered: function (isHovered) { root._trashHovered = isHovered }
     }
   }
 }
