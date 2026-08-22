@@ -6,7 +6,7 @@ import "Model.js" as Model
 Item {
   id: root
 
-  property var entry: ({})       // {name, path, size, mtime, partial}
+  property var entry: ({})       // {name, path, size, mtime, partial, stalled}
   property bool selected: false
   property color foreground: Color.foreground
   // The panel derives its own dim tone from the bar's foreground and passes it
@@ -25,7 +25,17 @@ Item {
   readonly property string ext: Model.extOf(entry.name || "")
   readonly property bool isImage: Model.isImageExt(ext)
   readonly property bool hot: mouse.containsMouse || selected
-  readonly property bool actionable: !(entry.partial === true)
+  // A stalled partial (its bytes stopped arriving — an aborted/failed
+  // download, not just a slow one) is treated like any other file: it keeps
+  // its .part/.crdownload name, but the row becomes actionable so it can be
+  // cleaned up. An actively-downloading partial stays fully non-actionable.
+  readonly property bool activelyDownloading: entry.partial === true && entry.stalled !== true
+  readonly property bool stalled: entry.partial === true && entry.stalled === true
+  readonly property bool actionable: !root.activelyDownloading
+  // Copy hands the file's current on-disk bytes to the clipboard; for a
+  // stalled/truncated partial that's a corrupt artifact masquerading as the
+  // finished file, a materially different failure mode than reveal or trash.
+  readonly property bool copyable: root.actionable && !root.stalled
 
   implicitHeight: Style.space(44)
 
@@ -81,7 +91,7 @@ Item {
         anchors.centerIn: parent
         visible: !root.isImage || thumbImage.status !== Image.Ready
         text: root.entry.partial === true ? "󰇚" : "󰈔"
-        color: root.entry.partial === true ? root.accent : root.dim
+        color: root.activelyDownloading ? root.accent : (root.stalled ? Color.urgent : root.dim)
         font.family: root.fontFamily
         font.pixelSize: Style.font.iconLarge
       }
@@ -107,11 +117,12 @@ Item {
       Text {
         width: parent.width
         text: {
-          if (root.entry.partial === true) return "downloading…"
+          if (root.activelyDownloading) return "downloading…"
+          if (root.stalled) return "Stalled — download incomplete"
           var sizeText = Model.humanSize(root.entry.size)
           return root.ext !== "" ? sizeText + " · ." + root.ext.toUpperCase() : sizeText
         }
-        color: root.entry.partial === true ? root.accent : root.dim
+        color: root.activelyDownloading ? root.accent : (root.stalled ? Color.urgent : root.dim)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
         elide: Text.ElideRight
@@ -127,7 +138,7 @@ Item {
     spacing: Style.space(2)
 
     Text {
-      visible: root.entry.partial === true
+      visible: root.activelyDownloading
       anchors.verticalCenter: parent.verticalCenter
       text: "󱥸"
       color: root.accent
@@ -135,7 +146,7 @@ Item {
       font.pixelSize: Style.font.icon
 
       RotationAnimator on rotation {
-        running: root.entry.partial === true
+        running: root.activelyDownloading
         from: 0
         to: 360
         duration: 800
@@ -154,7 +165,7 @@ Item {
     }
 
     PanelActionButton {
-      visible: root.hot && root.actionable
+      visible: root.hot && root.copyable
       anchors.verticalCenter: parent.verticalCenter
       iconText: "󰆏"
       tooltipText: "Copy file"

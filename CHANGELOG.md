@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 - Success toast banner ("Moved … to trash" / "Copied … to clipboard") shown after a quick action completes, auto-dismissing after ~2.5s.
+- Stalled-download detection: a partial download whose size stops changing (an aborted or failed download, not just a slow one) is flagged "Stalled — download incomplete" and becomes actionable (reveal/trash) instead of being stuck non-actionable forever; the bar icon and header stop indicating it as an active download. A suspected stall is double-checked against the file's real on-disk size (`bin/downloads-file-size`) before being shown as stalled, since the cached size Quickshell reports while a file is being actively written can itself lag for many seconds — so a genuinely active download is never misflagged, at the cost of taking up to ~40s to confirm a truly dead one.
 
 ### Changed
 - File names no longer repeat the extension; each row now shows the size and type together below the name (e.g. "130.8 KB · .PNG").

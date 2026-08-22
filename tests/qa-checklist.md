@@ -19,6 +19,9 @@ this — these are the interactions only a human can judge.
 - [ ] When it finishes, the row becomes a normal file at the top of the list (showing its real size again), its spinner is replaced by the usual hover actions, and the bar icon stops pulsing and returns to full opacity
 - [ ] With the panel closed, finishing a download shows the badge dot on the bar icon
 - [ ] Opening the panel clears the badge
+- [ ] Start a download, then freeze it (kill the browser mid-download, or disconnect networking) and wait ~30-40s: the row switches to a static, urgent-toned "Stalled — download incomplete" label, the bar icon/header stop indicating an active download, and reveal/trash become available on hover while copy stays hidden
+- [ ] A genuinely slow-but-active download (steadily growing, even if only every few seconds) never gets flagged stalled while bytes keep arriving
+- [ ] If the stalled download resumes growing before being trashed, the row goes back to the normal "downloading…" state on its own
 
 ## Quick actions
 - [ ] Row click opens the file with its default app and closes the panel

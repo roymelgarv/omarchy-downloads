@@ -273,6 +273,76 @@ test("entriesEqual handles null and undefined without throwing", () => {
   assert.equal(Model.entriesEqual([], []), true);
 });
 
+test("entriesEqual rejects entries identical except for a stalled flip", () => {
+  const a = [{ name: "a.part", path: "/a", size: 10, mtime: 5, partial: true, stalled: false }];
+  const b = [{ name: "a.part", path: "/a", size: 10, mtime: 5, partial: true, stalled: true }];
+  assert.equal(Model.entriesEqual(a, b), false);
+});
+
+// trackPartialProgress's `candidateStalled` is the cheap, FolderListModel-size
+// based signal only — a *suspicion*, not the final word. It's cheap because
+// it's free (already-collected data, no extra process), but FolderListModel's
+// cached fileSize does not reliably refresh while a file is being actively
+// written (reproduced live: a steadily-growing file got flagged despite real
+// growth), so Service.qml confirms a candidate against a real stat() before
+// ever showing "stalled" in the UI — see Service.qml's confirmStall().
+test("trackPartialProgress flags a partial file candidateStalled once its size stops moving for the threshold", () => {
+  const first = Model.trackPartialProgress(null, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 0, 1000);
+  assert.equal(first.entries[0].candidateStalled, false);
+  const second = Model.trackPartialProgress(first.history, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 999, 1000);
+  assert.equal(second.entries[0].candidateStalled, false);
+  const third = Model.trackPartialProgress(second.history, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 1000, 1000);
+  assert.equal(third.entries[0].candidateStalled, true);
+});
+
+test("trackPartialProgress self-heals: growth after a candidate stall resets candidateStalled to false", () => {
+  const first = Model.trackPartialProgress(null, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 0, 1000);
+  const stillCandidate = Model.trackPartialProgress(first.history, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 1000, 1000);
+  assert.equal(stillCandidate.entries[0].candidateStalled, true);
+  const resumed = Model.trackPartialProgress(stillCandidate.history, [{ name: "a.part", path: "/a", size: 150, mtime: 2, partial: true }], 1001, 1000);
+  assert.equal(resumed.entries[0].candidateStalled, false);
+});
+
+test("trackPartialProgress never immediately candidate-stalls a newly-seen partial file", () => {
+  const out = Model.trackPartialProgress(null, [{ name: "a.part", path: "/a", size: 0, mtime: 1, partial: true }], 5000, 1000);
+  assert.equal(out.entries[0].candidateStalled, false);
+});
+
+test("trackPartialProgress tracks simultaneous partial files independently", () => {
+  const history = {
+    stuck: { size: 100, lastChanged: 0 },
+    moving: { size: 100, lastChanged: 0 }
+  };
+  const out = Model.trackPartialProgress(history, [
+    { name: "stuck", path: "/stuck", size: 100, mtime: 1, partial: true },
+    { name: "moving", path: "/moving", size: 250, mtime: 2, partial: true }
+  ], 1000, 1000);
+  assert.equal(out.entries[0].candidateStalled, true);
+  assert.equal(out.entries[1].candidateStalled, false);
+});
+
+test("trackPartialProgress always returns candidateStalled: false for non-partial entries", () => {
+  const out = Model.trackPartialProgress(null, [{ name: "a.txt", path: "/a", size: 100, mtime: 1, partial: false }], 0, 1000);
+  assert.equal(out.entries[0].candidateStalled, false);
+});
+
+test("trackPartialProgress drops history for files no longer present (renamed to final or deleted)", () => {
+  const first = Model.trackPartialProgress(null, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 0, 1000);
+  assert.ok(Object.prototype.hasOwnProperty.call(first.history, "a.part"));
+  const second = Model.trackPartialProgress(first.history, [{ name: "a.txt", path: "/a", size: 100, mtime: 2, partial: false }], 500, 1000);
+  assert.equal(Object.prototype.hasOwnProperty.call(second.history, "a.part"), false);
+});
+
+// A plain {} inherits Object.prototype, so a partial file literally named
+// "constructor" must not read back a bogus prototype-chain hit as its
+// previous size/lastChanged — the same class of bug fixed in completedSince.
+test("trackPartialProgress tracks a partial file named after an Object.prototype member", () => {
+  const first = Model.trackPartialProgress(null, [{ name: "constructor", path: "/a", size: 100, mtime: 1, partial: true }], 0, 1000);
+  assert.equal(first.entries[0].candidateStalled, false);
+  const second = Model.trackPartialProgress(first.history, [{ name: "constructor", path: "/a", size: 100, mtime: 1, partial: true }], 1000, 1000);
+  assert.equal(second.entries[0].candidateStalled, true);
+});
+
 test("namesEqual detects the folder gaining, losing, or renaming a file", () => {
   assert.equal(Model.namesEqual(["a", "b"], ["a", "b"]), true);
   assert.equal(Model.namesEqual(["a"], ["a", "b"]), false);
