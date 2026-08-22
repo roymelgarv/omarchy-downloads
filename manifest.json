@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "roymelgarv.omarchy-downloads",
   "name": "Downloads",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "author": "Roy Melgar",
   "license": "MIT",
   "description": "Recent downloads at a glance: live folder watching, search, and quick actions from the bar.",
@@ -31,7 +31,7 @@
         "type": "integer",
         "label": "Recent files shown",
         "description": "How many recent files to list when not searching.",
-        "defaultValue": 5,
+        "defaultValue": 7,
         "min": 3,
         "max": 15
       },

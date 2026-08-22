@@ -4,6 +4,9 @@
 # URI instead of copying (used by the test suite, which has no compositor).
 set -euo pipefail
 
+# shellcheck source=lib.sh
+source "$(cd "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
 print_only=false
 if [[ "${1:-}" == "--print-uri" ]]; then
   print_only=true
@@ -13,23 +16,8 @@ fi
 file="${1:?usage: downloads-copy [--print-uri] <file>}"
 [[ -e "$file" ]] || { echo "downloads-copy: no such file: $file" >&2; exit 1; }
 
-# Absolute path without requiring realpath's target to be readable
-abs="$(cd "$(dirname -- "$file")" && pwd)/$(basename -- "$file")"
-
-# Percent-encode everything outside the URI unreserved set, keeping "/".
-encode() {
-  local s="$1" out="" c i
-  for ((i = 0; i < ${#s}; i++)); do
-    c="${s:i:1}"
-    case "$c" in
-      [A-Za-z0-9._~/-]) out+="$c" ;;
-      *) out+="$(printf '%%%02X' "'$c")" ;;
-    esac
-  done
-  printf '%s' "$out"
-}
-
-uri="file://$(encode "$abs")"
+abs="$(abs_path "$file")"
+uri="file://$(uri_encode_path "$abs")"
 
 if $print_only; then
   printf '%s\n' "$uri"

@@ -5,8 +5,6 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const Model = require("../Model.js");
 
-// ---------------------------------------------------------------- humanSize
-
 test("humanSize formats bytes below 1 KB as B", () => {
   assert.equal(Model.humanSize(0), "0 B");
   assert.equal(Model.humanSize(512), "512 B");
@@ -25,8 +23,6 @@ test("humanSize handles invalid input as 0 B", () => {
   assert.equal(Model.humanSize(undefined), "0 B");
 });
 
-// ---------------------------------------------------------------- extOf
-
 test("extOf returns lowercase extension without the dot", () => {
   assert.equal(Model.extOf("photo.JPEG"), "jpeg");
   assert.equal(Model.extOf("archive.tar.gz"), "gz");
@@ -37,7 +33,22 @@ test("extOf returns empty string for files without extension or dotfiles", () =>
   assert.equal(Model.extOf(".bashrc"), "");
 });
 
-// ------------------------------------------------------- partial downloads
+test("isImageExt recognizes known image extensions case-insensitively", () => {
+  assert.equal(Model.isImageExt("png"), true);
+  assert.equal(Model.isImageExt("JPEG"), true);
+  assert.equal(Model.isImageExt("pdf"), false);
+  assert.equal(Model.isImageExt(""), false);
+});
+
+test("baseName strips the extension shown separately as the file's type", () => {
+  assert.equal(Model.baseName("report.pdf"), "report");
+  assert.equal(Model.baseName("archive.tar.gz"), "archive.tar");
+});
+
+test("baseName leaves files without an extension or dotfiles untouched", () => {
+  assert.equal(Model.baseName("Makefile"), "Makefile");
+  assert.equal(Model.baseName(".bashrc"), ".bashrc");
+});
 
 test("isPartialDownload detects browser partial-download suffixes", () => {
   assert.equal(Model.isPartialDownload("movie.mkv.part"), true);
@@ -52,8 +63,6 @@ test("finalNameOf strips the partial suffix", () => {
   assert.equal(Model.finalNameOf("setup.exe.crdownload"), "setup.exe");
   assert.equal(Model.finalNameOf("doc.pdf"), "doc.pdf");
 });
-
-// ---------------------------------------------------------------- sorting
 
 test("sortByMtimeDesc orders newest first without mutating input", () => {
   const entries = [
@@ -73,8 +82,6 @@ test("sortByMtimeDesc breaks mtime ties by name for stable display", () => {
   ]);
   assert.deepEqual(sorted.map(e => e.name), ["a.txt", "b.txt"]);
 });
-
-// ---------------------------------------------------------------- search
 
 test("filterEntries returns newest-first entries when query is empty", () => {
   const entries = [
@@ -125,7 +132,25 @@ test("filterEntries returns empty array when nothing matches", () => {
   assert.deepEqual(Model.filterEntries("zzz", [{ name: "a.txt", mtime: 1 }]), []);
 });
 
-// ------------------------------------------------------------ badge logic
+test("withoutDownloadPlaceholders hides zero-byte files while something is downloading", () => {
+  const entries = [
+    { path: "/a", name: "a.crdownload", size: 1024, partial: true },
+    { path: "/b", name: "a.tar.gz", size: 0, partial: false },
+    { path: "/c", name: "c.txt", size: 500, partial: false }
+  ];
+  const out = Model.withoutDownloadPlaceholders(entries);
+  assert.deepEqual(out.map(e => e.path), ["/a", "/c"]);
+});
+
+test("withoutDownloadPlaceholders keeps zero-byte files when nothing is downloading", () => {
+  const entries = [{ path: "/a", name: "empty.txt", size: 0, partial: false }];
+  assert.deepEqual(Model.withoutDownloadPlaceholders(entries), entries);
+});
+
+test("withoutDownloadPlaceholders never hides the partial entry itself, even at 0 bytes", () => {
+  const entries = [{ path: "/a", name: "a.crdownload", size: 0, partial: true }];
+  assert.deepEqual(Model.withoutDownloadPlaceholders(entries), entries);
+});
 
 test("completedSince reports files that appeared since the previous scan", () => {
   const prev = ["a.pdf"];
@@ -149,7 +174,181 @@ test("completedSince reports nothing when files are only removed", () => {
   assert.deepEqual(Model.completedSince(["a.pdf", "b.iso"], ["a.pdf"]), []);
 });
 
-// ------------------------------------------------------------ elideMiddle
+// A plain {} inherits Object.prototype, so a file named after one of its
+// members ("constructor", "toString", …) reads back as already-seen and never
+// badges. The seen-set must have no prototype.
+test("completedSince badges files named after Object.prototype members", () => {
+  const out = Model.completedSince(["a.pdf"], ["constructor", "toString", "__proto__", "valueOf"]);
+  assert.deepEqual(out, ["constructor", "toString", "__proto__", "valueOf"]);
+});
+
+test("completedSince still suppresses a prototype-named file seen in the previous scan", () => {
+  assert.deepEqual(Model.completedSince(["constructor"], ["constructor"]), []);
+});
+
+test("withoutDownloadPlaceholders preserves input order", () => {
+  const entries = [
+    { path: "/a", name: "a.part", size: 10, partial: true },
+    { path: "/b", name: "b.txt", size: 30, partial: false },
+    { path: "/c", name: "c.txt", size: 20, partial: false }
+  ];
+  assert.deepEqual(Model.withoutDownloadPlaceholders(entries).map(e => e.path), ["/a", "/b", "/c"]);
+});
+
+test("visibleEntries takes the newest recentCount entries when the query is empty", () => {
+  const entries = [
+    { name: "new.txt", mtime: 300, size: 1, partial: false },
+    { name: "mid.txt", mtime: 200, size: 1, partial: false },
+    { name: "old.txt", mtime: 100, size: 1, partial: false }
+  ];
+  const out = Model.visibleEntries("", entries, 2);
+  assert.deepEqual(out.map(e => e.name), ["new.txt", "mid.txt"]);
+});
+
+test("visibleEntries treats a whitespace-only query as empty", () => {
+  const entries = [{ name: "a.txt", mtime: 1, size: 1, partial: false }];
+  assert.deepEqual(Model.visibleEntries("   ", entries, 5).map(e => e.name), ["a.txt"]);
+});
+
+test("visibleEntries ignores recentCount while searching, returning every match", () => {
+  const entries = [
+    { name: "report-1.pdf", mtime: 3, size: 1, partial: false },
+    { name: "report-2.pdf", mtime: 2, size: 1, partial: false },
+    { name: "report-3.pdf", mtime: 1, size: 1, partial: false }
+  ];
+  const out = Model.visibleEntries("report", entries, 1);
+  assert.equal(out.length, 3);
+});
+
+test("visibleEntries hides zero-byte placeholders while a download is in flight", () => {
+  const entries = [
+    { name: "movie.mkv.part", mtime: 3, size: 900, partial: true },
+    { name: "movie.mkv", mtime: 2, size: 0, partial: false },
+    { name: "notes.txt", mtime: 1, size: 40, partial: false }
+  ];
+  const out = Model.visibleEntries("", entries, 10);
+  assert.deepEqual(out.map(e => e.name), ["movie.mkv.part", "notes.txt"]);
+});
+
+test("visibleEntries relies on the caller's mtime-desc order rather than re-sorting", () => {
+  // Service.resync() already stores entries newest-first; re-sorting here
+  // would be redundant work on every folder event, per monitor.
+  const entries = [
+    { name: "b.txt", mtime: 100, size: 1, partial: false },
+    { name: "a.txt", mtime: 300, size: 1, partial: false }
+  ];
+  assert.deepEqual(Model.visibleEntries("", entries, 10).map(e => e.name), ["b.txt", "a.txt"]);
+});
+
+test("visibleEntries clamps a nonsensical recentCount to an empty list", () => {
+  const entries = [{ name: "a.txt", mtime: 1, size: 1, partial: false }];
+  assert.deepEqual(Model.visibleEntries("", entries, -3), []);
+});
+
+test("entriesEqual accepts lists with identical name, size, mtime and partial state", () => {
+  const a = [{ name: "a.txt", path: "/a", size: 10, mtime: 5, partial: false }];
+  const b = [{ name: "a.txt", path: "/a", size: 10, mtime: 5, partial: false }];
+  assert.equal(Model.entriesEqual(a, b), true);
+});
+
+test("entriesEqual rejects a changed size, so a growing download still republishes", () => {
+  const a = [{ name: "a.part", path: "/a", size: 10, mtime: 5, partial: true }];
+  const b = [{ name: "a.part", path: "/a", size: 20, mtime: 5, partial: true }];
+  assert.equal(Model.entriesEqual(a, b), false);
+});
+
+test("entriesEqual rejects changed length, order, mtime, or partial state", () => {
+  const base = [{ name: "a.txt", path: "/a", size: 1, mtime: 5, partial: false }];
+  assert.equal(Model.entriesEqual(base, []), false);
+  assert.equal(Model.entriesEqual(base, [base[0], base[0]]), false);
+  assert.equal(Model.entriesEqual(base, [{ name: "a.txt", path: "/a", size: 1, mtime: 6, partial: false }]), false);
+  assert.equal(Model.entriesEqual(base, [{ name: "a.txt", path: "/a", size: 1, mtime: 5, partial: true }]), false);
+  assert.equal(Model.entriesEqual(base, [{ name: "b.txt", path: "/b", size: 1, mtime: 5, partial: false }]), false);
+});
+
+test("entriesEqual handles null and undefined without throwing", () => {
+  assert.equal(Model.entriesEqual(null, []), false);
+  assert.equal(Model.entriesEqual([], null), false);
+  assert.equal(Model.entriesEqual(null, null), false);
+  assert.equal(Model.entriesEqual([], []), true);
+});
+
+test("entriesEqual rejects entries identical except for a stalled flip", () => {
+  const a = [{ name: "a.part", path: "/a", size: 10, mtime: 5, partial: true, stalled: false }];
+  const b = [{ name: "a.part", path: "/a", size: 10, mtime: 5, partial: true, stalled: true }];
+  assert.equal(Model.entriesEqual(a, b), false);
+});
+
+// trackPartialProgress's `candidateStalled` is the cheap, FolderListModel-size
+// based signal only — a *suspicion*, not the final word. It's cheap because
+// it's free (already-collected data, no extra process), but FolderListModel's
+// cached fileSize does not reliably refresh while a file is being actively
+// written (reproduced live: a steadily-growing file got flagged despite real
+// growth), so Service.qml confirms a candidate against a real stat() before
+// ever showing "stalled" in the UI — see Service.qml's confirmStall().
+test("trackPartialProgress flags a partial file candidateStalled once its size stops moving for the threshold", () => {
+  const first = Model.trackPartialProgress(null, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 0, 1000);
+  assert.equal(first.entries[0].candidateStalled, false);
+  const second = Model.trackPartialProgress(first.history, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 999, 1000);
+  assert.equal(second.entries[0].candidateStalled, false);
+  const third = Model.trackPartialProgress(second.history, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 1000, 1000);
+  assert.equal(third.entries[0].candidateStalled, true);
+});
+
+test("trackPartialProgress self-heals: growth after a candidate stall resets candidateStalled to false", () => {
+  const first = Model.trackPartialProgress(null, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 0, 1000);
+  const stillCandidate = Model.trackPartialProgress(first.history, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 1000, 1000);
+  assert.equal(stillCandidate.entries[0].candidateStalled, true);
+  const resumed = Model.trackPartialProgress(stillCandidate.history, [{ name: "a.part", path: "/a", size: 150, mtime: 2, partial: true }], 1001, 1000);
+  assert.equal(resumed.entries[0].candidateStalled, false);
+});
+
+test("trackPartialProgress never immediately candidate-stalls a newly-seen partial file", () => {
+  const out = Model.trackPartialProgress(null, [{ name: "a.part", path: "/a", size: 0, mtime: 1, partial: true }], 5000, 1000);
+  assert.equal(out.entries[0].candidateStalled, false);
+});
+
+test("trackPartialProgress tracks simultaneous partial files independently", () => {
+  const history = {
+    stuck: { size: 100, lastChanged: 0 },
+    moving: { size: 100, lastChanged: 0 }
+  };
+  const out = Model.trackPartialProgress(history, [
+    { name: "stuck", path: "/stuck", size: 100, mtime: 1, partial: true },
+    { name: "moving", path: "/moving", size: 250, mtime: 2, partial: true }
+  ], 1000, 1000);
+  assert.equal(out.entries[0].candidateStalled, true);
+  assert.equal(out.entries[1].candidateStalled, false);
+});
+
+test("trackPartialProgress always returns candidateStalled: false for non-partial entries", () => {
+  const out = Model.trackPartialProgress(null, [{ name: "a.txt", path: "/a", size: 100, mtime: 1, partial: false }], 0, 1000);
+  assert.equal(out.entries[0].candidateStalled, false);
+});
+
+test("trackPartialProgress drops history for files no longer present (renamed to final or deleted)", () => {
+  const first = Model.trackPartialProgress(null, [{ name: "a.part", path: "/a", size: 100, mtime: 1, partial: true }], 0, 1000);
+  assert.ok(Object.prototype.hasOwnProperty.call(first.history, "a.part"));
+  const second = Model.trackPartialProgress(first.history, [{ name: "a.txt", path: "/a", size: 100, mtime: 2, partial: false }], 500, 1000);
+  assert.equal(Object.prototype.hasOwnProperty.call(second.history, "a.part"), false);
+});
+
+// A plain {} inherits Object.prototype, so a partial file literally named
+// "constructor" must not read back a bogus prototype-chain hit as its
+// previous size/lastChanged — the same class of bug fixed in completedSince.
+test("trackPartialProgress tracks a partial file named after an Object.prototype member", () => {
+  const first = Model.trackPartialProgress(null, [{ name: "constructor", path: "/a", size: 100, mtime: 1, partial: true }], 0, 1000);
+  assert.equal(first.entries[0].candidateStalled, false);
+  const second = Model.trackPartialProgress(first.history, [{ name: "constructor", path: "/a", size: 100, mtime: 1, partial: true }], 1000, 1000);
+  assert.equal(second.entries[0].candidateStalled, true);
+});
+
+test("namesEqual detects the folder gaining, losing, or renaming a file", () => {
+  assert.equal(Model.namesEqual(["a", "b"], ["a", "b"]), true);
+  assert.equal(Model.namesEqual(["a"], ["a", "b"]), false);
+  assert.equal(Model.namesEqual(["a.part"], ["a"]), false);
+  assert.equal(Model.namesEqual(null, ["a"]), false);
+});
 
 test("elideMiddle leaves short names untouched", () => {
   assert.equal(Model.elideMiddle("short.txt", 20), "short.txt");
@@ -161,4 +360,54 @@ test("elideMiddle shortens long names in the middle, keeping the extension", () 
   assert.ok(out.includes("…"));
   assert.ok(out.endsWith("tar.gz"));
   assert.ok(out.startsWith("a-very"));
+});
+
+test("elideMiddle truncates without an ellipsis when max leaves no room for one", () => {
+  assert.equal(Model.elideMiddle("verylongname.txt", 3), "ver");
+  assert.equal(Model.elideMiddle("verylongname.txt", 0), "");
+});
+
+test("actionToastMessage formats a trash success message", () => {
+  assert.equal(Model.actionToastMessage("trash", "report.pdf"), 'Moved "report.pdf" to trash');
+});
+
+test("actionToastMessage formats a copy success message", () => {
+  assert.equal(Model.actionToastMessage("copy", "report.pdf"), 'Copied "report.pdf" to clipboard');
+});
+
+test("actionToastMessage keeps the full file name for a long name (banner wraps)", () => {
+  const longName = "a-very-long-download-file-name-from-somewhere-important.tar.gz";
+  const out = Model.actionToastMessage("trash", longName);
+  assert.ok(out.includes(longName));
+  assert.ok(!out.includes("…"));
+});
+
+test("actionToastMessage returns an empty string for an unknown action", () => {
+  assert.equal(Model.actionToastMessage("rename", "report.pdf"), "");
+});
+
+test("listRowsThatFit fits an exact whole-row multiple", () => {
+  // 8 rows of 44 with 2 spacing between: 8*44 + 7*2 = 366
+  assert.equal(Model.listRowsThatFit(366, 44, 2, 3), 8);
+});
+
+test("listRowsThatFit rounds a partial leftover down, never slicing a row", () => {
+  assert.equal(Model.listRowsThatFit(365, 44, 2, 3), 7);
+  assert.equal(Model.listRowsThatFit(366 + 45, 44, 2, 3), 8);
+});
+
+test("listRowsThatFit drops a row when a toast eats into the budget", () => {
+  const eightRows = 366;
+  const toast = 33 + 12; // banner + column spacing
+  assert.equal(Model.listRowsThatFit(eightRows - toast, 44, 2, 3), 7);
+});
+
+test("listRowsThatFit never goes below minRows", () => {
+  assert.equal(Model.listRowsThatFit(10, 44, 2, 3), 3);
+  assert.equal(Model.listRowsThatFit(-100, 44, 2, 3), 3);
+});
+
+test("listHeightForRows is the whole-row height including inner spacing", () => {
+  assert.equal(Model.listHeightForRows(8, 44, 2), 366);
+  assert.equal(Model.listHeightForRows(1, 44, 2), 44);
 });

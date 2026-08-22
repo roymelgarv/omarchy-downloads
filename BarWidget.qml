@@ -5,9 +5,10 @@ import qs.Commons
 import qs.Ui
 import "Model.js" as Model
 
-// Bar widget + popout for Downloads. One file on purpose, matching the
-// keyboard-cleaner layout: a qs.Ui Panel root owning the bar button and the
-// KeyboardPanel popout, with all folder state read from the singleton service.
+// Bar widget + popout for Downloads, following the keyboard-cleaner layout: a
+// qs.Ui Panel root owning the bar button and the KeyboardPanel popout, with all
+// folder state read from the singleton service. The panel's own layout stays
+// here; only self-contained pieces (FileRow, ActionToast) are separate files.
 Panel {
   id: root
   moduleName: "roymelgarv.omarchy-downloads"
@@ -21,21 +22,64 @@ Panel {
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
+  // The single definition of the panel's muted tone; passed down to children
+  // rather than re-derived by each of them.
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
-  readonly property int recentCount: setting("recentCount", 5)
-  readonly property bool confirmTrash: setting("confirmTrash", true)
+  // Clamped to the manifest schema's declared min/max: the shell hands back
+  // whatever value is stored without re-validating it against the schema.
+  readonly property int recentCount: {
+    var n = Number(setting("recentCount", 7))
+    if (!isFinite(n)) n = 7
+    return Math.max(3, Math.min(15, Math.round(n)))
+  }
+  // `=== true` for the same reason: setting() hands back the raw stored value,
+  // and QML would coerce the string "false" to a true bool.
+  readonly property bool confirmTrash: setting("confirmTrash", true) === true
+
+  // The list scrolls rather than growing past the card's height cap. Deriving
+  // the row count from the cap and the chrome above the list keeps it correct
+  // if either changes, instead of restating today's answer as a constant.
+  readonly property real cardHeightCap: Style.space(560)
+  // Hero, totals line, separator, search field, section header, Column spacings.
+  readonly property real listChromeHeight: Style.space(184)
+  // Must match FileRow's implicitHeight.
+  readonly property real rowHeight: Style.space(44)
+  readonly property real rowSpacing: Style.space(2)
+  // The list's cap is quantized to whole rows: the clipping ListView must
+  // cap on a row boundary, or a sliced last row reads as whatever sits
+  // below it overlapping the list.
+  readonly property int maxVisibleRows: Model.listRowsThatFit(
+    cardHeightCap - listChromeHeight, rowHeight, rowSpacing, 3)
+  readonly property real maxListHeight: Model.listHeightForRows(maxVisibleRows, rowHeight, rowSpacing)
+  // Extra standoff above the banner beyond the column's own spacing, so it
+  // reads as a separate element rather than a footer glued to the list.
+  readonly property real toastGap: Style.space(16)
+  // The toast must never displace list content: when it appears, the card
+  // grows by its footprint instead of the list giving up a row (which reads
+  // as the banner overlaying the last row). The cap only bounds the list.
+  readonly property real toastReservedHeight:
+    toast.height > 0 ? toast.height + toastGap + column.spacing : 0
 
   property string query: ""
   property int cursor: 0
+  // Gates the highlight separately from `cursor`, which defaults to a valid
+  // index so Enter/Delete work immediately — without this, row 0 would look
+  // selected before any real navigation.
+  property bool keyboardActive: false
   property var pendingTrash: null
 
-  readonly property var visibleEntries: {
-    if (!service) return []
-    var filtered = Model.filterEntries(query, service.entries)
-    return query.trim() === "" ? filtered.slice(0, recentCount) : filtered
+  Connections {
+    target: root.service
+    function onActionCompleted(action, name, success) {
+      if (!success) return
+      toast.show(Model.actionToastMessage(action, name))
+    }
   }
+
+  readonly property var visibleEntries:
+    service ? Model.visibleEntries(query, service.entries, recentCount) : []
 
   onVisibleEntriesChanged: if (cursor >= visibleEntries.length) cursor = Math.max(0, visibleEntries.length - 1)
 
@@ -60,17 +104,18 @@ Panel {
   Component.onDestruction: if (service) service.unregisterPanel(root)
 
   onOpenedChanged: {
-    if (service) service.anyPanelOpen = opened
     if (opened) {
       query = ""
       cursor = 0
+      keyboardActive = false
       pendingTrash = null
+      toast.clear()
       Qt.callLater(function () { searchField.forceActiveFocus() })
     }
   }
 
   function activate(entry) {
-    if (!entry || entry.partial === true || !service) return
+    if (!entry || (entry.partial === true && entry.stalled !== true) || !service) return
     service.openFile(entry.path)
     root.close()
   }
@@ -81,10 +126,19 @@ Panel {
     else service.trashFile(entry.path)
   }
 
+  // Delete reaches this handler before the search field's own editing, so
+  // claiming it unconditionally would make forward-delete impossible while
+  // typing a query — and with "Confirm before trashing" off, a mistyped
+  // correction would trash a file outright. Plain Delete therefore only
+  // trashes while the query is empty (the list is being navigated, not
+  // edited); Shift+Delete always does, for use mid-search.
+  function trashShortcutApplies(event) {
+    return (event.modifiers & Qt.ShiftModifier) || query === ""
+  }
+
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  // --------------------------------------------------------------- bar icon
   BarIconButton {
     id: button
     anchors.fill: parent
@@ -92,11 +146,22 @@ Panel {
     iconComponent: Component {
       Item {
         Text {
+          id: iconText
           anchors.centerIn: parent
           text: "󰇚"
           color: (!!root.service && root.service.downloadingCount > 0) ? Color.accent : root.barForeground
           font.family: root.fontFamily
           font.pixelSize: Style.font.icon
+
+          SequentialAnimation {
+            id: pulseAnim
+            running: !!root.service && root.service.downloadingCount > 0
+            loops: Animation.Infinite
+            onRunningChanged: if (!running) iconText.opacity = 1.0
+
+            NumberAnimation { target: iconText; property: "opacity"; from: 1.0; to: 0.35; duration: 600; easing.type: Easing.InOutQuad }
+            NumberAnimation { target: iconText; property: "opacity"; from: 0.35; to: 1.0; duration: 600; easing.type: Easing.InOutQuad }
+          }
         }
 
         // Completed-download badge, cleared when any panel opens.
@@ -119,7 +184,6 @@ Panel {
     }
   }
 
-  // ---------------------------------------------------------------- popout
   KeyboardPanel {
     id: panel
     anchorItem: button
@@ -128,7 +192,7 @@ Panel {
     open: root.opened
     focusTarget: searchField
     contentWidth: panel.fittedContentWidth(Style.space(400))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(560))
+    contentHeight: panel.fittedContentHeight(column.implicitHeight, root.cardHeightCap + root.toastReservedHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -142,43 +206,89 @@ Panel {
         width: parent.width
         spacing: Style.space(12)
 
-        // ---------------------------------------------------------- hero
-        PanelHero {
+        // Built manually rather than via PanelHero: its icon only centers
+        // against its own title+meta pairing, not against a hero that also
+        // includes an Open button, so the icon and both lines of text are
+        // laid out here directly, icon centered against the title+status
+        // pair as a whole.
+        Item {
           width: parent.width
-          title: "Downloads"
-          meta: root.service
-            ? Model.humanSize(root.service.totalBytes) + " total · " + root.service.totalCount +
-              (root.service.totalCount === 1 ? " file" : " files") +
-              (root.service.downloadingCount > 0 ? " · " + root.service.downloadingCount + " downloading" : "")
-            : "Loading…"
-          foreground: root.foreground
-          fontFamily: root.fontFamily
+          implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, openButton.implicitHeight)
 
-          iconComponent: Component {
+          Text {
+            id: heroIcon
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: "󰇚"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.display
+          }
+
+          Column {
+            id: heroLabels
+            anchors.left: heroIcon.right
+            anchors.leftMargin: Style.space(14)
+            anchors.right: openButton.left
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(2)
+
             Text {
-              text: "󰇚"
+              width: parent.width
+              text: "Downloads"
               color: root.foreground
               font.family: root.fontFamily
-              font.pixelSize: Style.font.display
+              font.pixelSize: Style.font.title
+              font.bold: true
+              elide: Text.ElideRight
+            }
+
+            Text {
+              visible: !!root.service
+              width: parent.width
+              text: (root.service && root.service.downloadingCount > 0 ? "Downloading files" : "No current downloads").toUpperCase()
+              color: root.service && root.service.downloadingCount > 0 ? Color.accent : root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+              font.letterSpacing: 1.2
+              elide: Text.ElideRight
             }
           }
 
-          trailingControl: Component {
-            Button {
-              text: "Open"
-              tooltipText: "Open the folder in the file manager"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              bordered: true
-              onClicked: {
-                if (root.service) root.service.openFolder()
-                root.close()
-              }
+          Button {
+            id: openButton
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Open"
+            tooltipText: "Open the folder in the file manager"
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            bordered: true
+            onClicked: {
+              if (root.service) root.service.openFolder()
+              root.close()
             }
           }
         }
 
-        // -------------------------------------------------------- search
+        Text {
+          visible: !!root.service
+          width: parent.width
+          text: root.service
+            ? Model.humanSize(root.service.totalBytes) + " total · " + root.service.totalCount +
+              (root.service.totalCount === 1 ? " file" : " files")
+            : "Loading…"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+          elide: Text.ElideRight
+        }
+
+        PanelSeparator { foreground: root.foreground }
+
         TextField {
           id: searchField
           width: parent.width
@@ -188,6 +298,11 @@ Panel {
           onTextChanged: {
             root.query = text
             root.cursor = 0
+            // Reset scroll on a new query specifically, not on every
+            // visibleEntries recompute — the folder watcher republishes the
+            // list on any file change, which would yank a scrolled list back
+            // to the top while the user is reading it.
+            fileList.positionViewAtBeginning()
           }
           Keys.onPressed: function (event) {
             if (root.pendingTrash !== null) {
@@ -195,9 +310,11 @@ Panel {
               return
             }
             if (event.key === Qt.Key_Down) {
+              root.keyboardActive = true
               root.cursor = Math.min(root.cursor + 1, root.visibleEntries.length - 1)
               event.accepted = true
             } else if (event.key === Qt.Key_Up) {
+              root.keyboardActive = true
               root.cursor = Math.max(root.cursor - 1, 0)
               event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
@@ -206,7 +323,7 @@ Panel {
             } else if (event.key === Qt.Key_Escape) {
               if (root.query !== "") { root.query = "" } else { root.close() }
               event.accepted = true
-            } else if (event.key === Qt.Key_Delete) {
+            } else if (event.key === Qt.Key_Delete && root.trashShortcutApplies(event)) {
               root.requestTrash(root.visibleEntries[root.cursor])
               event.accepted = true
             }
@@ -223,25 +340,53 @@ Panel {
           wrapMode: Text.WordWrap
         }
 
-        PanelSeparator { foreground: root.foreground }
-
-        // ---------------------------------------------------------- list
         Column {
           width: parent.width
           spacing: Style.space(2)
 
-          Repeater {
+          Text {
+            visible: root.query.trim() === "" && root.visibleEntries.length > 0
+            width: parent.width
+            bottomPadding: Style.space(4)
+            text: "Recent downloads".toUpperCase()
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            font.bold: true
+          }
+
+          // A ListView rather than a Repeater because search ignores
+          // recentCount and returns every match: a Column of unbounded height
+          // is silently cut off by the card's height cap, leaving matches
+          // unreachable by mouse *and* keyboard. Capping the view's height
+          // makes the overflow scroll, and ListView's positionViewAtIndex is
+          // what keeps the keyboard cursor inside the viewport.
+          ListView {
+            id: fileList
+            width: parent.width
+            height: Math.min(contentHeight, root.maxListHeight)
+            spacing: root.rowSpacing
+            clip: true
+            // Rubber-band overscroll reads as a glitch in a small popout card.
+            boundsBehavior: Flickable.StopAtBounds
             model: root.visibleEntries
-            FileRow {
+            currentIndex: root.cursor
+            // ListView.Contain scrolls only when the row is actually outside
+            // the viewport, so arrowing within view doesn't jump the list.
+            onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
+
+            delegate: FileRow {
               required property var modelData
               required property int index
-              width: parent.width
+              // A delegate's parent is the internal content item, not the
+              // view, so parent.width would be wrong here.
+              width: ListView.view.width
               entry: modelData
-              selected: index === root.cursor
+              selected: root.keyboardActive && index === root.cursor
               foreground: root.foreground
+              dim: root.dim
               accent: Color.accent
               fontFamily: root.fontFamily
-              onHoveredRow: root.cursor = index
               onOpenRequested: root.activate(modelData)
               onRevealRequested: if (root.service) root.service.revealFile(modelData.path)
               onCopyRequested: if (root.service) root.service.copyFile(modelData.path)
@@ -265,9 +410,25 @@ Panel {
             horizontalAlignment: Text.AlignHCenter
           }
         }
+
+        // Spacer wrapper: a Column can't give one child extra margin, so the
+        // standoff is baked into this item's height. Bottom-anchoring the
+        // banner keeps the extra space above it, and the whole thing
+        // collapses to 0 with the toast.
+        Item {
+          width: parent.width
+          height: toast.height > 0 ? toast.height + root.toastGap : 0
+
+          ActionToast {
+            id: toast
+            width: parent.width
+            anchors.bottom: parent.bottom
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+          }
+        }
       }
 
-      // ------------------------------------------------- trash confirm
       ConfirmDialog {
         id: confirmDialog
         anchors.fill: parent
