@@ -20,11 +20,17 @@ Item {
   signal revealRequested()
   signal copyRequested()
   signal trashRequested()
-  signal hoveredRow()
 
   readonly property string ext: Model.extOf(entry.name || "")
   readonly property bool isImage: Model.isImageExt(ext)
-  readonly property bool hot: mouse.containsMouse || selected
+  // Qt Quick only delivers hover to the topmost item at the pointer, so
+  // hovering a button would otherwise drop the row's own containsMouse and
+  // hide the buttons (visible: root.hot && …) mid-hover. Each button's own
+  // hovered() signal keeps the row "hot" across itself and all its buttons.
+  readonly property bool hot: mouse.containsMouse || selected || _revealHovered || _copyHovered || _trashHovered
+  property bool _revealHovered: false
+  property bool _copyHovered: false
+  property bool _trashHovered: false
   // A stalled partial (its bytes stopped arriving — an aborted/failed
   // download, not just a slow one) is treated like any other file: it keeps
   // its .part/.crdownload name, but the row becomes actionable so it can be
@@ -66,7 +72,6 @@ Item {
     anchors.fill: parent
     hoverEnabled: true
     cursorShape: root.actionable ? Qt.PointingHandCursor : Qt.ArrowCursor
-    onEntered: root.hoveredRow()
     onClicked: if (root.actionable) root.openRequested()
   }
 
@@ -161,6 +166,7 @@ Item {
       foreground: root.foreground
       fontFamily: root.fontFamily
       onClicked: root.revealRequested()
+      onHovered: function (isHovered) { root._revealHovered = isHovered }
     }
 
     PanelActionButton {
@@ -171,6 +177,7 @@ Item {
       foreground: root.foreground
       fontFamily: root.fontFamily
       onClicked: root.copyRequested()
+      onHovered: function (isHovered) { root._copyHovered = isHovered }
     }
 
     PanelActionButton {
@@ -182,6 +189,7 @@ Item {
       hoverColor: Color.urgent
       fontFamily: root.fontFamily
       onClicked: root.trashRequested()
+      onHovered: function (isHovered) { root._trashHovered = isHovered }
     }
   }
 }

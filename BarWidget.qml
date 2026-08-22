@@ -64,6 +64,10 @@ Panel {
 
   property string query: ""
   property int cursor: 0
+  // Gates the highlight separately from `cursor`, which defaults to a valid
+  // index so Enter/Delete work immediately — without this, row 0 would look
+  // selected before any real navigation.
+  property bool keyboardActive: false
   property var pendingTrash: null
 
   Connections {
@@ -103,6 +107,7 @@ Panel {
     if (opened) {
       query = ""
       cursor = 0
+      keyboardActive = false
       pendingTrash = null
       toast.clear()
       Qt.callLater(function () { searchField.forceActiveFocus() })
@@ -305,9 +310,11 @@ Panel {
               return
             }
             if (event.key === Qt.Key_Down) {
+              root.keyboardActive = true
               root.cursor = Math.min(root.cursor + 1, root.visibleEntries.length - 1)
               event.accepted = true
             } else if (event.key === Qt.Key_Up) {
+              root.keyboardActive = true
               root.cursor = Math.max(root.cursor - 1, 0)
               event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
@@ -375,12 +382,11 @@ Panel {
               // view, so parent.width would be wrong here.
               width: ListView.view.width
               entry: modelData
-              selected: index === root.cursor
+              selected: root.keyboardActive && index === root.cursor
               foreground: root.foreground
               dim: root.dim
               accent: Color.accent
               fontFamily: root.fontFamily
-              onHoveredRow: root.cursor = index
               onOpenRequested: root.activate(modelData)
               onRevealRequested: if (root.service) root.service.revealFile(modelData.path)
               onCopyRequested: if (root.service) root.service.copyFile(modelData.path)
