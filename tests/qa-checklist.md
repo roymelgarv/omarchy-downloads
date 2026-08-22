@@ -24,7 +24,7 @@ this — these are the interactions only a human can judge.
 - [ ] Opening the panel clears the badge
 - [ ] Start a download, then freeze it (kill the browser mid-download, or disconnect networking) and wait ~30-40s: the row switches to a static, urgent-toned "Stalled — download incomplete" label, the bar icon/header stop indicating an active download, and reveal/trash become available on hover while copy stays hidden
 - [ ] A genuinely slow-but-active download (steadily growing, even if only every few seconds) never gets flagged stalled while bytes keep arriving
-- [ ] If the stalled download resumes growing before being trashed, the row goes back to the normal "downloading…" state on its own
+- [ ] If the stalled download resumes growing before being trashed, the row goes back to the normal cycling "downloading" state on its own
 
 ## Quick actions
 - [ ] Moving the mouse from the row onto its folder/copy/trash buttons keeps the row highlighted and the buttons visible the whole way, with no flicker

@@ -7,11 +7,12 @@ Your Downloads folder, one click away. A bar widget for [Omarchy](https://omarch
 ## Features
 
 - **Recent downloads at a glance** — the newest files in your Downloads folder, with size and type.
-- **Live tracking** — new files appear instantly; in-progress downloads (`.part`, `.crdownload`) show as downloading, and the bar icon gets a badge when a download finishes.
+- **Live tracking** — new files appear instantly; in-progress downloads (`.part`, `.crdownload`, `.download`) show as downloading while the bar icon pulses, and it gets a badge when one finishes while the panel is closed.
+- **Stalled downloads surfaced** — when a download dies partway through (browser crash, dropped connection), its row stops claiming to be in progress and is marked *Stalled — download incomplete*, so you can reveal or trash the leftover file instead of watching it spin forever.
 - **Search everything** — type to filter the *entire* folder, not just the recent list. Enter opens the top match.
-- **Quick actions** on every file: open (default app), reveal in file manager, copy to clipboard (paste into any file manager or chat), move to trash (with confirmation).
+- **Quick actions** on any finished file: open (default app), reveal in file manager, copy to clipboard (paste into any file manager or chat), move to trash (with confirmation). Files still downloading stay non-actionable, so you can't open or copy a half-written one by accident.
 - **Folder totals** — total size and file count in the header, plus a button to open the folder.
-- **100% local** — no network access, no sudo, no external binaries. Just QML and a few tiny shell helpers (`wl-copy`, `gio`, `xdg-open` — all part of a standard Omarchy install).
+- **100% local** — no network access, no sudo, no bundled binaries. Just QML and a few tiny shell helpers (`wl-copy`, `gio`, `xdg-open`, `stat` — all part of a standard Omarchy install).
 
 ## Install
 
@@ -32,6 +33,18 @@ Plugins can't ship keybindings, but one line in `~/.config/hypr/bindings.conf` s
 ```conf
 bind = SUPER, D, exec, omarchy-shell downloads toggle
 ```
+
+### Keyboard
+
+The panel opens with the search field already focused, so you can start typing straight away.
+
+| Key | Action |
+|---|---|
+| `↑` / `↓` | Move the selection |
+| `Enter` | Open the selected file |
+| `Delete` | Trash the selected file — only while the search box is empty, so it still forward-deletes as you type |
+| `Shift`+`Delete` | Trash the selected file, even mid-search |
+| `Esc` | Clear the search first, then close the panel |
 
 ## Configure
 
@@ -61,8 +74,9 @@ omarchy plugin remove roymelgarv.omarchy-downloads
 See [CONTRIBUTING.md](CONTRIBUTING.md). Short version:
 
 ```bash
-node --test tests/*.test.mjs     # unit tests
-scripts/dev.sh         # deploy to the live shell (hot reload)
+node --test tests/*.test.mjs   # unit tests
+scripts/dev.sh                 # deploy to the live shell
+scripts/dev.sh --restart       # deploy + restart the shell (required after Service.qml edits)
 ```
 
 ## License
