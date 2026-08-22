@@ -380,7 +380,6 @@ Panel {
               dim: root.dim
               accent: Color.accent
               fontFamily: root.fontFamily
-              onHoveredRow: root.cursor = index
               onOpenRequested: root.activate(modelData)
               onRevealRequested: if (root.service) root.service.revealFile(modelData.path)
               onCopyRequested: if (root.service) root.service.copyFile(modelData.path)

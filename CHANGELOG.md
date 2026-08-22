@@ -18,6 +18,7 @@ All notable changes to this project are documented here. The format follows
 - The file list is only republished when its contents actually changed, so an unrelated folder event no longer resets the list's scroll position or re-requests every thumbnail.
 
 ### Fixed
+- A file row's hover highlight stuck around after the mouse actually left it, because hovering synced the keyboard-navigation cursor to that row and nothing ever reset it on mouse-exit. The highlight now only follows real-time hover or actual arrow-key navigation.
 - The in-progress download row's spinning icon could freeze mid-rotation after the panel was closed and reopened, since Qt Quick pauses a window's animations while it isn't visible. Replaced with an animated "downloading." / ".." / "..." dot cycle driven by a Timer, which keeps advancing regardless of the panel's visibility.
 - Search results past the eighth match were drawn outside the popout card, leaving them unreachable by mouse and keyboard. The file list now scrolls once it exceeds eight rows, and arrow-key navigation keeps the selected row in view.
 - Folder totals read "0 B · 0 files" whenever the watched folder was itself hidden (`~/.downloads`) or lived under a hidden directory (`~/.local/share/downloads`), because the hidden-file filter tested the whole path instead of each entry's own name.

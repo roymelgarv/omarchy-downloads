@@ -20,7 +20,6 @@ Item {
   signal revealRequested()
   signal copyRequested()
   signal trashRequested()
-  signal hoveredRow()
 
   readonly property string ext: Model.extOf(entry.name || "")
   readonly property bool isImage: Model.isImageExt(ext)
@@ -66,7 +65,6 @@ Item {
     anchors.fill: parent
     hoverEnabled: true
     cursorShape: root.actionable ? Qt.PointingHandCursor : Qt.ArrowCursor
-    onEntered: root.hoveredRow()
     onClicked: if (root.actionable) root.openRequested()
   }
 

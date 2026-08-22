@@ -10,6 +10,7 @@ this — these are the interactions only a human can judge.
 - [ ] Recent list shows the configured number of files, newest first
 - [ ] Image files show thumbnails; other files show the type glyph and extension chip
 - [ ] Long file names elide in the middle without breaking the row layout
+- [ ] Hovering a row highlights it and shows its hover actions; moving the mouse off that row (without touching the keyboard) clears the highlight — it doesn't stick to the last-hovered row
 
 ## Live tracking
 - [ ] Download a real file in a browser (Chrome and Firefox, if both available): a downloading row appears, its label cycling "downloading." / ".." / "..." roughly twice a second
