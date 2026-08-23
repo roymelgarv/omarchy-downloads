@@ -66,7 +66,13 @@ restart_shell() {
 
 deploy() {
   mkdir -p "$DEST"
-  rsync -a --delete --exclude '.git' --exclude 'node_modules' "$SRC/" "$DEST/"
+  # .claude/.agents/skills-lock.json are Claude Code's local skill-loading
+  # artifacts (symlinks included) — never part of the plugin, and
+  # `omarchy plugin validate` below hard-fails on any symlink it finds.
+  rsync -a --delete \
+    --exclude '.git' --exclude 'node_modules' \
+    --exclude '.claude' --exclude '.agents' --exclude 'skills-lock.json' \
+    "$SRC/" "$DEST/"
   touch "$STAMP"
   omarchy plugin validate "$DEST"
   if ((RESTART)); then
@@ -83,7 +89,9 @@ if ((WATCH)); then
   echo "Watching for changes (Ctrl+C to stop)..."
   while sleep 1; do
     if find "$SRC" -newer "$STAMP" \
-      -not -path '*/.git/*' -not -path '*/node_modules/*' -print -quit |
+      -not -path '*/.git/*' -not -path '*/node_modules/*' \
+      -not -path '*/.claude/*' -not -path '*/.agents/*' \
+      -not -name 'skills-lock.json' -print -quit |
       grep -q .; then
       deploy
     fi

@@ -4,3 +4,11 @@ node_modules/
 
 # Local agent guide — kept out of the public repo
 CLAUDE.md
+
+# Claude Code skill-loading artifacts. Skills can be symlinked in on load
+# (e.g. .claude/skills/<name> -> ../../.agents/skills/<name>), and
+# `omarchy plugin validate` hard-fails on any symlink anywhere in the plugin
+# folder, so none of this may ever be tracked.
+.claude/
+.agents/
+skills-lock.json
