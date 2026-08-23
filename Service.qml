@@ -92,8 +92,19 @@ Item {
     showDirs: false
     showHidden: false
     showOnlyReadable: true
-    // Sorting is done in Model.js from the extracted entries; the model's own
-    // order is irrelevant, but Time keeps incremental updates cheap.
+    // Final tie-broken ordering is still done in Model.js from the extracted
+    // entries, but this model's own order matters now that resync() below
+    // only walks the first _maxTrackedEntries of files.count: that window
+    // has to already be newest-first for it to mean "the most recent
+    // entries" rather than an arbitrary slice.
+    //
+    // Time alone is what gives that. It maps to QDir::Time, which is
+    // *already* most-recent-first, so sortReversed must stay at its default
+    // false — setting it true flips the model to oldest-first, and the cap
+    // would then silently hold the 2,000 oldest files while Model.js
+    // re-sorted that wrong window newest-first, so the list would look
+    // correctly ordered and never show a recent download. Verified against
+    // Qt 6 with a three-file fixture rather than taken from the docs.
     sortField: FolderListModel.Time
 
     onCountChanged: root.scheduleResync()
@@ -124,10 +135,20 @@ Item {
     onTriggered: root.resync()
   }
 
+  // Practical ceiling on how many folder entries a single resync() copies,
+  // partial-tracks, sorts and diffs. Without one, an unbounded (or
+  // adversarial) downloads folder makes every FolderListModel change — and
+  // the 2s in-flight-download poll below — redo full-tree work forever, in
+  // the shell's one long-lived singleton instance. Search and the recent
+  // list only ever see this many of the newest files once a folder exceeds
+  // it, which is the trade a bar-widget recent-downloads list can afford.
+  readonly property int _maxTrackedEntries: 2000
+
   function resync() {
     var out = []
     var names = []
-    for (var i = 0; i < files.count; i++) {
+    var count = Math.min(files.count, root._maxTrackedEntries)
+    for (var i = 0; i < count; i++) {
       var name = String(files.get(i, "fileName"))
       var modified = files.get(i, "fileModified")
       out.push({
@@ -226,6 +247,25 @@ Item {
     confirmProcess._name = next.name
     confirmProcess.command = ["bash", pluginDir + "/bin/downloads-file-size", next.path]
     confirmProcess.running = true
+    confirmDeadline.restart()
+  }
+
+  // downloads-file-size is a single stat() and should return instantly, but
+  // stat() on a wedged network mount blocks indefinitely — and _confirmRunning
+  // gates the whole FIFO, so one hung check would stop every later
+  // confirmation from ever running while _confirmQueue kept growing. Killing
+  // it self-heals: onExited already treats a nonzero exit as "skip this one
+  // and let the next resync decide".
+  Timer {
+    id: confirmDeadline
+    interval: 10000
+    repeat: false
+    onTriggered: {
+      if (confirmProcess.running) {
+        console.warn("omarchy-downloads: downloads-file-size exceeded its deadline; killing it")
+        confirmProcess.signal(9)
+      }
+    }
   }
 
   property Process confirmProcess: Process {
@@ -237,6 +277,7 @@ Item {
       waitForEnd: true
     }
     onExited: function (exitCode) {
+      confirmDeadline.stop()
       var name = confirmProcess._name
       delete root._pendingConfirmations[name]
       if (exitCode === 0) {
@@ -301,6 +342,26 @@ Item {
       if (statsProcess.running) { statsDebounce.restart(); return }
       statsProcess.command = ["bash", root.pluginDir + "/bin/downloads-stats", root.folder]
       statsProcess.running = true
+      statsDeadline.restart()
+    }
+  }
+
+  // Backstop for downloads-stats' own internal timeout: that guards against
+  // a slow/huge tree, but if the helper somehow doesn't come back at all —
+  // a missing `timeout` binary, a wedged bash — this is what actually stops
+  // it rather than leaving it running forever in the shell's long-lived
+  // process. SIGKILL (9), not a softer signal: this only fires once the
+  // helper is already well past every bound it's supposed to respect, so
+  // there's nothing left to let it clean up.
+  Timer {
+    id: statsDeadline
+    interval: 15000
+    repeat: false
+    onTriggered: {
+      if (statsProcess.running) {
+        console.warn("omarchy-downloads: downloads-stats exceeded its deadline; killing it")
+        statsProcess.signal(9)
+      }
     }
   }
 
@@ -322,6 +383,7 @@ Item {
         }
       }
     }
+    onExited: statsDeadline.stop()
   }
 
   function openFile(path) {

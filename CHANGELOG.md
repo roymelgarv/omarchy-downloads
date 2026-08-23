@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com), and the project adheres to
 [Semantic Versioning](https://semver.org).
 
+## [1.0.1] - 2026-08-23
+
+### Security
+- Bounded the resource use of folder scanning, flagged in marketplace review. A large or adversarial downloads tree could previously keep the helper busy and amplify CPU/memory in the long-lived shell process:
+  - `resync()` now processes at most 2,000 of the newest folder entries per pass, instead of copying and re-sorting the whole folder on every watcher event and every 2s poll.
+  - `bin/downloads-stats` bounds its recursive walk (`-maxdepth 20`, a 20,000-file output cap, and a 10s `timeout`), degrading to a floor total rather than failing.
+  - Overdue helpers are now stopped rather than left running: the shell kills `downloads-stats` after 15s, and `downloads-file-size` after 10s — the latter also unblocks the stall-confirmation queue, which a single hung `stat()` on an unresponsive mount could previously wedge permanently.
+- Filesystem-derived text (file names, and error messages that quote a path) is now always rendered as plain text instead of Qt's default `AutoText`, which could otherwise interpret a crafted file name as rich-text markup — an `<img>` tag in a filename would have been enough to make the panel fetch a remote URL.
+
+### Fixed
+- Folder totals silently read "0 B · 0 files" instead of reporting an error when `timeout` was unavailable.
+
 ## [1.0.0] - 2026-08-22
 
 ### Added
