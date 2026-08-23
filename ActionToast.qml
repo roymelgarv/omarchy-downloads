@@ -69,6 +69,10 @@ Rectangle {
     topPadding: root.contentPadding
     bottomPadding: root.contentPadding
     text: "✓ " + root._message
+    // root._message embeds a filesystem-controlled file name (see
+    // Model.actionToastMessage) — force plain text so a crafted name can't
+    // get promoted to RichText by Text's default AutoText.
+    textFormat: Text.PlainText
     color: root.foreground
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall

@@ -82,6 +82,58 @@ teardown() {
   [ "$status" -ne 0 ]
 }
 
+# The three bounds below exist because this script runs on a timer inside the
+# long-lived shell process, where an unbounded walk of a large or adversarial
+# tree amplifies CPU/memory. They're env-overridable purely so these tests
+# don't have to build a 20,000-file fixture.
+
+@test "downloads-stats stops counting at its output cap" {
+  for i in $(seq 1 10); do printf 'a' > "$FIXTURE/f$i.txt"; done
+
+  run env DOWNLOADS_STATS_MAX_FILES=4 "$BIN/downloads-stats" "$FIXTURE"
+  [ "$status" -eq 0 ]
+  # A cap, not a failure: the totals become a floor rather than an exact count.
+  [ "$(echo "$output" | jq .count)" -eq 4 ]
+  [ "$(echo "$output" | jq .bytes)" -eq 4 ]
+}
+
+@test "downloads-stats stops descending at its traversal cap" {
+  mkdir -p "$FIXTURE/one/two/three"
+  printf 'a' > "$FIXTURE/top.txt"              # depth 1, counted
+  printf 'bb' > "$FIXTURE/one/mid.txt"         # depth 2, counted
+  printf 'cccc' > "$FIXTURE/one/two/deep.txt"  # depth 3, past the cap
+
+  run env DOWNLOADS_STATS_MAX_DEPTH=2 "$BIN/downloads-stats" "$FIXTURE"
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq .count)" -eq 2 ]
+  [ "$(echo "$output" | jq .bytes)" -eq 3 ]
+}
+
+@test "downloads-stats gives up on a walk that outruns its deadline" {
+  printf 'aaaa' > "$FIXTURE/a.txt"
+
+  # A stubbed `find` that never returns stands in for a tree too large or too
+  # slow (a stalled network mount) to finish. Shadowing the real binary is
+  # what makes this deterministic — a tiny deadline against a small real tree
+  # doesn't trip, because find wins the race every time.
+  stub="$(mktemp -d)"
+  printf '#!/usr/bin/env bash\nsleep 30\n' > "$stub/find"
+  chmod +x "$stub/find"
+
+  local -i start=$SECONDS
+  run env PATH="$stub:$PATH" DOWNLOADS_STATS_DEADLINE=1 "$BIN/downloads-stats" "$FIXTURE"
+  local -i elapsed=$(( SECONDS - start ))
+  rm -rf "$stub"
+
+  # Bounded: it returns on the deadline, not when the walk feels like it.
+  [ "$elapsed" -lt 15 ]
+  # And degrades to a valid, empty result rather than erroring or emitting a
+  # truncated object — the panel shows a stale/zero total, not a broken one.
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e . >/dev/null
+  [ "$(echo "$output" | jq .count)" -eq 0 ]
+}
+
 @test "downloads-copy encodes the file path as a percent-encoded file URI" {
   touch "$FIXTURE/my file (1).pdf"
   run "$BIN/downloads-copy" --print-uri "$FIXTURE/my file (1).pdf"

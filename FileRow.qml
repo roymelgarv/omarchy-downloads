@@ -129,6 +129,10 @@ Item {
       Text {
         width: parent.width
         text: Model.baseName(root.entry.name || "")
+        // Filesystem-controlled: a file named e.g. "<img src=…>.png" must
+        // render as that literal string, not get promoted to RichText by
+        // Text's default AutoText and interpreted as markup.
+        textFormat: Text.PlainText
         color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
@@ -143,6 +147,9 @@ Item {
           var sizeText = Model.humanSize(root.entry.size)
           return root.ext !== "" ? sizeText + " · ." + root.ext.toUpperCase() : sizeText
         }
+        // root.ext is derived from the filesystem-controlled name too (see
+        // the PlainText note above).
+        textFormat: Text.PlainText
         color: root.activelyDownloading ? root.accent : (root.stalled ? Color.urgent : root.dim)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
