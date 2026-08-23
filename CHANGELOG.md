@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com), and the project adheres to
 [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [1.0.1] - 2026-08-23
 
 ### Security
 - Bounded the resource use of folder scanning, flagged in marketplace review. A large or adversarial downloads tree could previously keep the helper busy and amplify CPU/memory in the long-lived shell process:
